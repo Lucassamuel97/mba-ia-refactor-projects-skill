@@ -12,7 +12,7 @@ O enunciado completo está em [desafio.md](desafio.md).
 | 1 | Análise manual | Problemas de cada projeto, documentados na seção "Análise Manual" | Concluída |
 | 2 | Criação da skill | `SKILL.md` e arquivos de referência em `code-smells-project/.claude/skills/refactor-arch/` | Concluída |
 | 3 | Execução no projeto 1 | `code-smells-project` refatorado e `reports/audit-project-1.md` | Concluída |
-| 4 | Execução no projeto 2 | `ecommerce-api-legacy` refatorado e `reports/audit-project-2.md` | Pendente |
+| 4 | Execução no projeto 2 | `ecommerce-api-legacy` refatorado e `reports/audit-project-2.md` | Concluída |
 | 5 | Execução no projeto 3 | `task-manager-api` refatorado e `reports/audit-project-3.md` | Pendente |
 | 6 | Documentação final | As quatro seções deste README preenchidas, no repositório público | Pendente |
 
@@ -245,7 +245,8 @@ Antes das execuções completas, as duas fases de leitura foram ensaiadas no pro
 ### Iterações
 
 - **Projeto 1:** a execução completa funcionou na primeira tentativa. O único ajuste na skill veio do resumo final: a execução reportou três findings "resolvidos com ressalva", categoria que o template não previa, e o template ganhou a seção `Partial`.
-- **Projetos 2 e 3:** a registrar nas etapas 4 e 5.
+- **Projeto 2:** a mesma skill, copiada sem alteração, funcionou na primeira tentativa em Node.js/Express. Nenhum ajuste foi necessário.
+- **Projeto 3:** a registrar na etapa 5.
 
 ## Resultados
 
@@ -254,7 +255,7 @@ Antes das execuções completas, as duas fases de leitura foram ensaiadas no pro
 | Projeto | CRITICAL | HIGH | MEDIUM | LOW | Total | Resolvidos | Relatório |
 |---|---|---|---|---|---|---|---|
 | code-smells-project | 6 | 6 | 4 | 4 | 20 | 19 (3 parciais), 1 adiado | [audit-project-1.md](reports/audit-project-1.md) |
-| ecommerce-api-legacy | | | | | | pendente (etapa 4) | |
+| ecommerce-api-legacy | 5 | 6 | 4 | 4 | 19 | 19 (3 parciais), nenhum adiado | [audit-project-2.md](reports/audit-project-2.md) |
 | task-manager-api | | | | | | pendente (etapa 5) | |
 
 ### Projeto 1 — code-smells-project
@@ -342,9 +343,94 @@ Fase 3 — Refatoração
 - [x] Aplicação inicia sem erros
 - [x] Endpoints originais respondem corretamente
 
-### Projetos 2 e 3
+### Projeto 2 — ecommerce-api-legacy
 
-Pendentes (etapas 4 e 5). As observações sobre o comportamento da skill em stacks diferentes entram depois dessas execuções.
+A skill foi copiada do projeto 1 sem alteração e rodou as 3 fases em uma única execução, agora em Node.js/Express. O relatório cobriu os 15 problemas da análise manual e acrescentou outros, entre eles um que derrubava o processo: `card` numérico fazia `cc.startsWith` lançar exceção dentro do callback do driver, fora do alcance do Express.
+
+**Findings resolvidos:** 19 de 19, sendo 3 parciais.
+
+- **Transação:** o checkout passou a gravar matrícula, pagamento e auditoria em uma transação. Apagar um usuário continua deixando matrículas e pagamentos órfãos, porque removê-los tiraria receita do relatório financeiro.
+- **Autenticação:** as rotas administrativa e destrutiva exigem token. O checkout segue sem autenticação, porque exigir isso muda o contrato.
+- **Validação:** tipos e formato de email são validados. `pwd` opcional e matrícula repetida no mesmo curso ficaram como antes, para não recusar chamadas hoje aceitas.
+
+**Estrutura antes e depois:**
+
+```
+ANTES                         DEPOIS
+src/app.js                    src/app.js            (composition root)
+src/AppManager.js             src/config/           index
+src/utils.js                  src/database/         connection, schema
+                              src/models/           user, course, enrollment, payment, auditLog, report
+                              src/services/         checkout, report, paymentGateway
+                              src/controllers/      checkout, report, user
+                              src/routes/           checkout, admin, user
+                              src/middlewares/      asyncHandler, errorHandler, requireAdminToken
+                              src/utils/            errors, logger, password
+                              .env.example
+```
+
+O código passou de 3 arquivos e 180 linhas para 25 módulos e cerca de 570 linhas. A God Class `AppManager` deixou de existir, e os callbacks aninhados viraram `async/await` sobre uma conexão com promises e transações.
+
+**Validação:**
+
+- **Boot:** `npm start` sobe sem nenhuma variável de ambiente.
+- **Smoke test da skill:** 20 requisições; 12 respostas idênticas às originais e 8 mudanças intencionais. Repetido com o token de administrador, 17 de 20 idênticas; as 3 restantes são as validações novas do checkout.
+- **Linha de base independente** (`bash baseline/run.sh 2`): com `ADMIN_TOKEN` definido e o cabeçalho enviado, as 11 respostas são idênticas a [baseline/project-2.txt](baseline/project-2.txt). Sem o token, 6 de 11 são idênticas e as outras 5 (relatório financeiro e exclusão de usuário) respondem 403.
+- **Nova varredura:** nenhum segredo literal, nenhum SQL fora de `models/` e `database/`, nenhum `req`/`res` em models e services, nenhuma variável global mutável; `console.*` só dentro do módulo de logger.
+
+Log do boot e dos checkouts após a refatoração:
+
+```
+> node src/app.js
+
+[INFO] Frankenstein LMS rodando na porta 3000...
+[INFO] Processando 497 no cartão final 4444 (chave do gateway ausente)
+[INFO] Checkout concluído: matrícula 2 em "Docker"
+[INFO] Processando 997 no cartão final 4444 (chave do gateway ausente)
+[INFO] Checkout concluído: matrícula 4 em "Clean Architecture"
+```
+
+O log original imprimia o número completo do cartão e a chave `pk_live` do gateway a cada checkout.
+
+**Mudanças de comportamento:**
+
+- `GET /api/admin/financial-report` e `DELETE /api/users/:id` exigem o cabeçalho `X-Admin-Token` igual à variável `ADMIN_TOKEN`; sem a variável, respondem 403. Com o token, as respostas são idênticas às originais.
+- O relatório financeiro sai em ordem estável (por id); antes a ordem dependia de qual callback terminava primeiro.
+- `POST /api/checkout` recusa com 400 campos que não são texto e email sem `@`; antes eram gravados ou derrubavam o processo.
+- Checkout sem `pwd` continua respondendo 200, mas a conta é criada sem senha, em vez da senha padrão `123456`.
+- As senhas, inclusive a do seed, são gravadas com hash scrypt e salt.
+- Erros internos respondem 500 com mensagem genérica.
+
+**Checklist de validação:**
+
+Fase 1 — Análise
+- [x] Linguagem detectada corretamente (JavaScript, Node.js)
+- [x] Framework detectado corretamente (Express 4.22.1, lido do lockfile)
+- [x] Domínio da aplicação descrito corretamente (API de LMS com checkout de cursos)
+- [x] Número de arquivos analisados condiz com a realidade (3 arquivos, 180 linhas, 3 rotas)
+
+Fase 2 — Auditoria
+- [x] Relatório segue o template definido nos arquivos de referência
+- [x] Cada finding tem arquivo e linhas exatos
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados (19)
+- [x] Detecção de APIs deprecated incluída (`Deprecated APIs: none detected`)
+- [x] Skill pausa e pede confirmação antes da Fase 3
+
+Fase 3 — Refatoração
+- [x] Estrutura de diretórios segue padrão MVC
+- [x] Configuração extraída para módulo de config (sem hardcoded)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado
+- [x] Entry point claro
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente (as duas rotas protegidas, com o token)
+
+### Projeto 3
+
+Pendente (etapa 5). As observações sobre o comportamento da skill em stacks diferentes entram depois dessa execução.
 
 ## Como Executar
 
@@ -398,6 +484,13 @@ diff baseline/project-1.txt /tmp/depois-1.txt
 ```
 
 As únicas diferenças esperadas são nas requisições marcadas com "deve mudar", que cobrem falhas de segurança corrigidas pela refatoração (senhas expostas, SQL injection, rotas administrativas sem autenticação).
+
+No projeto 2, o relatório financeiro e a exclusão de usuário passaram a exigir token. Para compará-los com o original, defina o token da aplicação e o cabeçalho do smoke test:
+
+```bash
+ADMIN_TOKEN=meu-token SMOKE_HEADERS='{"X-Admin-Token":"meu-token"}' bash baseline/run.sh 2 /tmp/depois-2.txt
+diff baseline/project-2.txt /tmp/depois-2.txt
+```
 
 Se a refatoração mudar o entry point, informe o novo comando em `START_CMD` (e `SEED_CMD`, no projeto 3):
 

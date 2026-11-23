@@ -7,9 +7,12 @@ O transcript é normalizado (JSON com chaves ordenadas, timestamps trocados por 
 para que rodadas antes/depois da refatoração possam ser comparadas com `diff`.
 Um caso com "unordered": true também tem as listas ordenadas, para respostas cuja
 ordem a API não garante.
+A variável de ambiente SMOKE_HEADERS (JSON) acrescenta cabeçalhos a todas as requisições,
+para testar rotas que passaram a exigir token após a refatoração.
 Só usa a biblioteca padrão.
 """
 import json
+import os
 import re
 import sys
 import time
@@ -18,6 +21,7 @@ import urllib.request
 
 TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?")
 BOOT_TIMEOUT_S = 30
+EXTRA_HEADERS = json.loads(os.environ.get("SMOKE_HEADERS", "{}"))
 
 
 def wait_until_up(base_url):
@@ -35,7 +39,7 @@ def wait_until_up(base_url):
 
 def call(base_url, method, path, body):
     data = None
-    headers = {}
+    headers = dict(EXTRA_HEADERS)
     if body is not None:
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"

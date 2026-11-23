@@ -9,6 +9,8 @@
 #   bash baseline/run.sh 1 /tmp/depois-1.txt && diff baseline/project-1.txt /tmp/depois-1.txt
 #
 # START_CMD e SEED_CMD sobrescrevem os comandos padrão, caso o entry point mude.
+# Para rotas que passaram a exigir token, defina a variável da aplicação e o cabeçalho:
+#   ADMIN_TOKEN=t SMOKE_HEADERS='{"X-Admin-Token":"t"}' bash baseline/run.sh 2 /tmp/depois-2.txt
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
