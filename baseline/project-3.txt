@@ -1,0 +1,787 @@
+### 01 GET /
+HTTP 200
+{
+  "message": "Task Manager API",
+  "version": "1.0"
+}
+
+### 02 GET /health
+HTTP 200
+{
+  "status": "ok",
+  "timestamp": "<TS>"
+}
+
+### 03 GET /tasks
+HTTP 200
+[
+  {
+    "category_id": 1,
+    "category_name": "Backend",
+    "created_at": "<TS>",
+    "description": "Adicionar autenticação real com JWT",
+    "due_date": "<TS>",
+    "id": 1,
+    "overdue": true,
+    "priority": 1,
+    "status": "pending",
+    "tags": [],
+    "title": "Implementar autenticação JWT",
+    "updated_at": "<TS>",
+    "user_id": 1,
+    "user_name": "João Silva"
+  },
+  {
+    "category_id": 2,
+    "category_name": "Frontend",
+    "created_at": "<TS>",
+    "description": "Tela de login responsiva",
+    "due_date": "<TS>",
+    "id": 2,
+    "overdue": false,
+    "priority": 2,
+    "status": "in_progress",
+    "tags": [],
+    "title": "Criar tela de login",
+    "updated_at": "<TS>",
+    "user_id": 2,
+    "user_name": "Maria Santos"
+  },
+  {
+    "category_id": 3,
+    "category_name": "DevOps",
+    "created_at": "<TS>",
+    "description": "Pipeline com GitHub Actions",
+    "due_date": null,
+    "id": 3,
+    "overdue": false,
+    "priority": 2,
+    "status": "done",
+    "tags": [
+      "devops",
+      "ci",
+      "github"
+    ],
+    "title": "Configurar CI/CD",
+    "updated_at": "<TS>",
+    "user_id": 3,
+    "user_name": "Pedro Oliveira"
+  },
+  {
+    "category_id": 4,
+    "category_name": "Bug",
+    "created_at": "<TS>",
+    "description": "Filtro não funciona com caracteres especiais",
+    "due_date": "<TS>",
+    "id": 4,
+    "overdue": true,
+    "priority": 1,
+    "status": "pending",
+    "tags": [],
+    "title": "Corrigir bug no filtro de busca",
+    "updated_at": "<TS>",
+    "user_id": 1,
+    "user_name": "João Silva"
+  },
+  {
+    "category_id": 1,
+    "category_name": "Backend",
+    "created_at": "<TS>",
+    "description": "Endpoints retornam todos os registros",
+    "due_date": "<TS>",
+    "id": 5,
+    "overdue": false,
+    "priority": 3,
+    "status": "pending",
+    "tags": [],
+    "title": "Adicionar paginação na API",
+    "updated_at": "<TS>",
+    "user_id": 1,
+    "user_name": "João Silva"
+  },
+  {
+    "category_id": 1,
+    "category_name": "Backend",
+    "created_at": "<TS>",
+    "description": "Cobertura mínima de 80%",
+    "due_date": null,
+    "id": 6,
+    "overdue": false,
+    "priority": 2,
+    "status": "pending",
+    "tags": [],
+    "title": "Escrever testes unitários",
+    "updated_at": "<TS>",
+    "user_id": 2,
+    "user_name": "Maria Santos"
+  },
+  {
+    "category_id": 1,
+    "category_name": "Backend",
+    "created_at": "<TS>",
+    "description": "Gerar documentação automática",
+    "due_date": null,
+    "id": 7,
+    "overdue": false,
+    "priority": 4,
+    "status": "cancelled",
+    "tags": [],
+    "title": "Documentar API com Swagger",
+    "updated_at": "<TS>",
+    "user_id": 3,
+    "user_name": "Pedro Oliveira"
+  },
+  {
+    "category_id": 1,
+    "category_name": "Backend",
+    "created_at": "<TS>",
+    "description": "Melhorar organização dos models",
+    "due_date": null,
+    "id": 8,
+    "overdue": false,
+    "priority": 3,
+    "status": "in_progress",
+    "tags": [
+      "refactor",
+      "tech-debt"
+    ],
+    "title": "Refatorar models",
+    "updated_at": "<TS>",
+    "user_id": 2,
+    "user_name": "Maria Santos"
+  },
+  {
+    "category_id": 3,
+    "category_name": "DevOps",
+    "created_at": "<TS>",
+    "description": "Prometheus + Grafana",
+    "due_date": "<TS>",
+    "id": 9,
+    "overdue": false,
+    "priority": 4,
+    "status": "pending",
+    "tags": [],
+    "title": "Configurar monitoramento",
+    "updated_at": "<TS>",
+    "user_id": 3,
+    "user_name": "Pedro Oliveira"
+  },
+  {
+    "category_id": 1,
+    "category_name": "Backend",
+    "created_at": "<TS>",
+    "description": "Usar marshmallow ou pydantic",
+    "due_date": null,
+    "id": 10,
+    "overdue": false,
+    "priority": 3,
+    "status": "pending",
+    "tags": [
+      "improvement",
+      "validation"
+    ],
+    "title": "Melhorar validações de input",
+    "updated_at": "<TS>",
+    "user_id": 1,
+    "user_name": "João Silva"
+  }
+]
+
+### 04 GET /tasks/1
+HTTP 200
+{
+  "category_id": 1,
+  "created_at": "<TS>",
+  "description": "Adicionar autenticação real com JWT",
+  "due_date": "<TS>",
+  "id": 1,
+  "overdue": true,
+  "priority": 1,
+  "status": "pending",
+  "tags": [],
+  "title": "Implementar autenticação JWT",
+  "updated_at": "<TS>",
+  "user_id": 1
+}
+
+### 05 GET /tasks/999  # inexistente
+HTTP 404
+{
+  "error": "Task não encontrada"
+}
+
+### 06 GET /tasks/search?q=API
+HTTP 200
+[
+  {
+    "category_id": 1,
+    "created_at": "<TS>",
+    "description": "Endpoints retornam todos os registros",
+    "due_date": "<TS>",
+    "id": 5,
+    "priority": 3,
+    "status": "pending",
+    "tags": [],
+    "title": "Adicionar paginação na API",
+    "updated_at": "<TS>",
+    "user_id": 1
+  },
+  {
+    "category_id": 1,
+    "created_at": "<TS>",
+    "description": "Gerar documentação automática",
+    "due_date": null,
+    "id": 7,
+    "priority": 4,
+    "status": "cancelled",
+    "tags": [],
+    "title": "Documentar API com Swagger",
+    "updated_at": "<TS>",
+    "user_id": 3
+  }
+]
+
+### 07 GET /tasks/search?status=pending&priority=1&user_id=1
+HTTP 200
+[
+  {
+    "category_id": 1,
+    "created_at": "<TS>",
+    "description": "Adicionar autenticação real com JWT",
+    "due_date": "<TS>",
+    "id": 1,
+    "priority": 1,
+    "status": "pending",
+    "tags": [],
+    "title": "Implementar autenticação JWT",
+    "updated_at": "<TS>",
+    "user_id": 1
+  },
+  {
+    "category_id": 4,
+    "created_at": "<TS>",
+    "description": "Filtro não funciona com caracteres especiais",
+    "due_date": "<TS>",
+    "id": 4,
+    "priority": 1,
+    "status": "pending",
+    "tags": [],
+    "title": "Corrigir bug no filtro de busca",
+    "updated_at": "<TS>",
+    "user_id": 1
+  }
+]
+
+### 08 GET /tasks/stats
+HTTP 200
+{
+  "cancelled": 1,
+  "completion_rate": 10.0,
+  "done": 1,
+  "in_progress": 2,
+  "overdue": 2,
+  "pending": 6,
+  "total": 10
+}
+
+### 09 POST /tasks
+> {"title": "Revisar pull requests", "description": "Fila da sprint", "priority": 2, "user_id": 1, "category_id": 1, "due_date": "2030-01-15", "tags": ["review", "sprint"]}
+HTTP 201
+{
+  "category_id": 1,
+  "created_at": "<TS>",
+  "description": "Fila da sprint",
+  "due_date": "<TS>",
+  "id": 11,
+  "priority": 2,
+  "status": "pending",
+  "tags": [
+    "review",
+    "sprint"
+  ],
+  "title": "Revisar pull requests",
+  "updated_at": "<TS>",
+  "user_id": 1
+}
+
+### 10 POST /tasks  # título curto
+> {"title": "ab"}
+HTTP 400
+{
+  "error": "Título muito curto"
+}
+
+### 11 POST /tasks  # status inválido
+> {"title": "Status ruim", "status": "voando"}
+HTTP 400
+{
+  "error": "Status inválido"
+}
+
+### 12 POST /tasks  # prioridade fora da faixa
+> {"title": "Prioridade ruim", "priority": 9}
+HTTP 400
+{
+  "error": "Prioridade deve ser entre 1 e 5"
+}
+
+### 13 POST /tasks  # usuário inexistente
+> {"title": "Usuário fantasma", "user_id": 999}
+HTTP 404
+{
+  "error": "Usuário não encontrado"
+}
+
+### 14 POST /tasks  # formato de data inválido
+> {"title": "Data ruim", "due_date": "15/01/2030"}
+HTTP 400
+{
+  "error": "Formato de data inválido. Use YYYY-MM-DD"
+}
+
+### 15 PUT /tasks/11
+> {"status": "done", "priority": 1, "tags": "review,done"}
+HTTP 200
+{
+  "category_id": 1,
+  "created_at": "<TS>",
+  "description": "Fila da sprint",
+  "due_date": "<TS>",
+  "id": 11,
+  "priority": 1,
+  "status": "done",
+  "tags": [
+    "review",
+    "done"
+  ],
+  "title": "Revisar pull requests",
+  "updated_at": "<TS>",
+  "user_id": 1
+}
+
+### 16 PUT /tasks/999  # inexistente
+> {"status": "done"}
+HTTP 404
+{
+  "error": "Task não encontrada"
+}
+
+### 17 DELETE /tasks/11
+HTTP 200
+{
+  "message": "Task deletada com sucesso"
+}
+
+### 18 DELETE /tasks/999  # inexistente
+HTTP 404
+{
+  "error": "Task não encontrada"
+}
+
+### 19 GET /users
+HTTP 200
+[
+  {
+    "active": true,
+    "created_at": "<TS>",
+    "email": "joao@email.com",
+    "id": 1,
+    "name": "João Silva",
+    "role": "admin",
+    "task_count": 4
+  },
+  {
+    "active": true,
+    "created_at": "<TS>",
+    "email": "maria@email.com",
+    "id": 2,
+    "name": "Maria Santos",
+    "role": "user",
+    "task_count": 3
+  },
+  {
+    "active": true,
+    "created_at": "<TS>",
+    "email": "pedro@email.com",
+    "id": 3,
+    "name": "Pedro Oliveira",
+    "role": "manager",
+    "task_count": 3
+  }
+]
+
+### 20 GET /users/1  # expõe hash MD5 da senha; deve mudar
+HTTP 200
+{
+  "active": true,
+  "created_at": "<TS>",
+  "email": "joao@email.com",
+  "id": 1,
+  "name": "João Silva",
+  "password": "81dc9bdb52d04dc20036dbd8313ed055",
+  "role": "admin",
+  "tasks": [
+    {
+      "category_id": 1,
+      "created_at": "<TS>",
+      "description": "Adicionar autenticação real com JWT",
+      "due_date": "<TS>",
+      "id": 1,
+      "priority": 1,
+      "status": "pending",
+      "tags": [],
+      "title": "Implementar autenticação JWT",
+      "updated_at": "<TS>",
+      "user_id": 1
+    },
+    {
+      "category_id": 4,
+      "created_at": "<TS>",
+      "description": "Filtro não funciona com caracteres especiais",
+      "due_date": "<TS>",
+      "id": 4,
+      "priority": 1,
+      "status": "pending",
+      "tags": [],
+      "title": "Corrigir bug no filtro de busca",
+      "updated_at": "<TS>",
+      "user_id": 1
+    },
+    {
+      "category_id": 1,
+      "created_at": "<TS>",
+      "description": "Endpoints retornam todos os registros",
+      "due_date": "<TS>",
+      "id": 5,
+      "priority": 3,
+      "status": "pending",
+      "tags": [],
+      "title": "Adicionar paginação na API",
+      "updated_at": "<TS>",
+      "user_id": 1
+    },
+    {
+      "category_id": 1,
+      "created_at": "<TS>",
+      "description": "Usar marshmallow ou pydantic",
+      "due_date": null,
+      "id": 10,
+      "priority": 3,
+      "status": "pending",
+      "tags": [
+        "improvement",
+        "validation"
+      ],
+      "title": "Melhorar validações de input",
+      "updated_at": "<TS>",
+      "user_id": 1
+    }
+  ]
+}
+
+### 21 GET /users/999  # inexistente
+HTTP 404
+{
+  "error": "Usuário não encontrado"
+}
+
+### 22 GET /users/1/tasks
+HTTP 200
+[
+  {
+    "created_at": "<TS>",
+    "description": "Adicionar autenticação real com JWT",
+    "due_date": "<TS>",
+    "id": 1,
+    "overdue": true,
+    "priority": 1,
+    "status": "pending",
+    "title": "Implementar autenticação JWT"
+  },
+  {
+    "created_at": "<TS>",
+    "description": "Filtro não funciona com caracteres especiais",
+    "due_date": "<TS>",
+    "id": 4,
+    "overdue": true,
+    "priority": 1,
+    "status": "pending",
+    "title": "Corrigir bug no filtro de busca"
+  },
+  {
+    "created_at": "<TS>",
+    "description": "Endpoints retornam todos os registros",
+    "due_date": "<TS>",
+    "id": 5,
+    "overdue": false,
+    "priority": 3,
+    "status": "pending",
+    "title": "Adicionar paginação na API"
+  },
+  {
+    "created_at": "<TS>",
+    "description": "Usar marshmallow ou pydantic",
+    "due_date": null,
+    "id": 10,
+    "overdue": false,
+    "priority": 3,
+    "status": "pending",
+    "title": "Melhorar validações de input"
+  }
+]
+
+### 23 POST /users  # expõe hash da senha; deve mudar
+> {"name": "Ana Lima", "email": "ana@email.com", "password": "segredo1", "role": "user"}
+HTTP 201
+{
+  "active": true,
+  "created_at": "<TS>",
+  "email": "ana@email.com",
+  "id": 4,
+  "name": "Ana Lima",
+  "password": "f594aaa3d8adce1a113d83c20a69de4a",
+  "role": "user"
+}
+
+### 24 POST /users  # email duplicado
+> {"name": "Ana Dois", "email": "ana@email.com", "password": "segredo1"}
+HTTP 409
+{
+  "error": "Email já cadastrado"
+}
+
+### 25 POST /users  # email inválido
+> {"name": "Email ruim", "email": "sem-arroba", "password": "segredo1"}
+HTTP 400
+{
+  "error": "Email inválido"
+}
+
+### 26 POST /users  # senha curta
+> {"name": "Senha curta", "email": "curta@email.com", "password": "123"}
+HTTP 400
+{
+  "error": "Senha deve ter no mínimo 4 caracteres"
+}
+
+### 27 PUT /users/4  # expõe hash da senha; deve mudar
+> {"name": "Ana L. Souza", "role": "manager"}
+HTTP 200
+{
+  "active": true,
+  "created_at": "<TS>",
+  "email": "ana@email.com",
+  "id": 4,
+  "name": "Ana L. Souza",
+  "password": "f594aaa3d8adce1a113d83c20a69de4a",
+  "role": "manager"
+}
+
+### 28 POST /login  # token falso e hash exposto; deve mudar
+> {"email": "joao@email.com", "password": "1234"}
+HTTP 200
+{
+  "message": "Login realizado com sucesso",
+  "token": "fake-jwt-token-1",
+  "user": {
+    "active": true,
+    "created_at": "<TS>",
+    "email": "joao@email.com",
+    "id": 1,
+    "name": "João Silva",
+    "password": "81dc9bdb52d04dc20036dbd8313ed055",
+    "role": "admin"
+  }
+}
+
+### 29 POST /login  # senha errada
+> {"email": "joao@email.com", "password": "errada"}
+HTTP 401
+{
+  "error": "Credenciais inválidas"
+}
+
+### 30 DELETE /users/4
+HTTP 200
+{
+  "message": "Usuário deletado com sucesso"
+}
+
+### 31 DELETE /users/999  # inexistente
+HTTP 404
+{
+  "error": "Usuário não encontrado"
+}
+
+### 32 GET /reports/summary
+HTTP 200
+{
+  "generated_at": "<TS>",
+  "overdue": {
+    "count": 2,
+    "tasks": [
+      {
+        "days_overdue": 3,
+        "due_date": "<TS>",
+        "id": 1,
+        "title": "Implementar autenticação JWT"
+      },
+      {
+        "days_overdue": 1,
+        "due_date": "<TS>",
+        "id": 4,
+        "title": "Corrigir bug no filtro de busca"
+      }
+    ]
+  },
+  "overview": {
+    "total_categories": 4,
+    "total_tasks": 10,
+    "total_users": 3
+  },
+  "recent_activity": {
+    "tasks_completed_last_7_days": 1,
+    "tasks_created_last_7_days": 10
+  },
+  "tasks_by_priority": {
+    "critical": 2,
+    "high": 3,
+    "low": 2,
+    "medium": 3,
+    "minimal": 0
+  },
+  "tasks_by_status": {
+    "cancelled": 1,
+    "done": 1,
+    "in_progress": 2,
+    "pending": 6
+  },
+  "user_productivity": [
+    {
+      "completed_tasks": 0,
+      "completion_rate": 0.0,
+      "total_tasks": 4,
+      "user_id": 1,
+      "user_name": "João Silva"
+    },
+    {
+      "completed_tasks": 0,
+      "completion_rate": 0.0,
+      "total_tasks": 3,
+      "user_id": 2,
+      "user_name": "Maria Santos"
+    },
+    {
+      "completed_tasks": 1,
+      "completion_rate": 33.33,
+      "total_tasks": 3,
+      "user_id": 3,
+      "user_name": "Pedro Oliveira"
+    }
+  ]
+}
+
+### 33 GET /reports/user/1
+HTTP 200
+{
+  "statistics": {
+    "cancelled": 0,
+    "completion_rate": 0.0,
+    "done": 0,
+    "high_priority": 2,
+    "in_progress": 0,
+    "overdue": 2,
+    "pending": 4,
+    "total_tasks": 4
+  },
+  "user": {
+    "email": "joao@email.com",
+    "id": 1,
+    "name": "João Silva"
+  }
+}
+
+### 34 GET /reports/user/999  # inexistente
+HTTP 404
+{
+  "error": "Usuário não encontrado"
+}
+
+### 35 GET /categories
+HTTP 200
+[
+  {
+    "color": "#3498db",
+    "created_at": "<TS>",
+    "description": "Tarefas de backend",
+    "id": 1,
+    "name": "Backend",
+    "task_count": 6
+  },
+  {
+    "color": "#2ecc71",
+    "created_at": "<TS>",
+    "description": "Tarefas de frontend",
+    "id": 2,
+    "name": "Frontend",
+    "task_count": 1
+  },
+  {
+    "color": "#e74c3c",
+    "created_at": "<TS>",
+    "description": "Tarefas de infraestrutura",
+    "id": 3,
+    "name": "DevOps",
+    "task_count": 2
+  },
+  {
+    "color": "#e67e22",
+    "created_at": "<TS>",
+    "description": "Correção de bugs",
+    "id": 4,
+    "name": "Bug",
+    "task_count": 1
+  }
+]
+
+### 36 POST /categories
+> {"name": "Docs", "description": "Documentação", "color": "#9b59b6"}
+HTTP 201
+{
+  "color": "#9b59b6",
+  "created_at": "<TS>",
+  "description": "Documentação",
+  "id": 5,
+  "name": "Docs"
+}
+
+### 37 POST /categories  # nome obrigatório
+> {"description": "sem nome"}
+HTTP 400
+{
+  "error": "Nome é obrigatório"
+}
+
+### 38 PUT /categories/5
+> {"name": "Documentação", "color": "#8e44ad"}
+HTTP 200
+{
+  "color": "#8e44ad",
+  "created_at": "<TS>",
+  "description": "Documentação",
+  "id": 5,
+  "name": "Documentação"
+}
+
+### 39 DELETE /categories/5
+HTTP 200
+{
+  "message": "Categoria deletada"
+}
+
+### 40 DELETE /categories/999  # inexistente
+HTTP 404
+{
+  "error": "Categoria não encontrada"
+}
+

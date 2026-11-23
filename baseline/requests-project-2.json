@@ -1,0 +1,15 @@
+[
+  {"method": "GET", "path": "/api/admin/financial-report", "unordered": true, "note": "estado inicial dos seeds; rota admin sem autenticação"},
+
+  {"method": "POST", "path": "/api/checkout", "body": {"usr": "Guilherme", "eml": "gui@fullcycle.com.br", "pwd": "senhaforte", "c_id": 2, "card": "4111222233334444"}, "note": "sucesso, usuário novo"},
+  {"method": "POST", "path": "/api/checkout", "body": {"usr": "Leonan", "eml": "leonan@fullcycle.com.br", "pwd": "123", "c_id": 2, "card": "4000000000000002"}, "note": "sucesso, usuário existente"},
+  {"method": "POST", "path": "/api/checkout", "body": {"usr": "Sem Senha", "eml": "semsenha@teste.com", "c_id": 1, "card": "4111222233334444"}, "note": "sem pwd: hoje cai na senha padrão 123456"},
+  {"method": "POST", "path": "/api/checkout", "body": {"usr": "João", "eml": "joao@teste.com", "pwd": "123", "c_id": 1, "card": "5111222233334444"}, "note": "pagamento recusado"},
+  {"method": "POST", "path": "/api/checkout", "body": {"usr": "Maria", "eml": "maria@teste.com", "pwd": "123", "c_id": 999, "card": "4111222233334444"}, "note": "curso inexistente"},
+  {"method": "POST", "path": "/api/checkout", "body": {"usr": "Incompleto", "c_id": 1}, "note": "campos obrigatórios faltando"},
+
+  {"method": "GET", "path": "/api/admin/financial-report", "unordered": true, "note": "após os checkouts; a ordem varia entre execuções (corrida de callbacks)"},
+  {"method": "DELETE", "path": "/api/users/1", "note": "hoje deixa matrículas e pagamentos órfãos"},
+  {"method": "DELETE", "path": "/api/users/999", "note": "inexistente: hoje responde 200 mesmo assim"},
+  {"method": "GET", "path": "/api/admin/financial-report", "unordered": true, "note": "após o delete: aluno vira Unknown"}
+]

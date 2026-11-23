@@ -1,0 +1,598 @@
+### 01 GET /
+HTTP 200
+{
+  "endpoints": {
+    "health": "/health",
+    "login": "/login",
+    "pedidos": "/pedidos",
+    "produtos": "/produtos",
+    "relatorios": "/relatorios/vendas",
+    "usuarios": "/usuarios"
+  },
+  "mensagem": "Bem-vindo à API da Loja",
+  "versao": "1.0.0"
+}
+
+### 02 GET /health  # expõe secret_key; deve mudar após a refatoração
+HTTP 200
+{
+  "ambiente": "producao",
+  "counts": {
+    "pedidos": 0,
+    "produtos": 10,
+    "usuarios": 3
+  },
+  "database": "connected",
+  "db_path": "loja.db",
+  "debug": true,
+  "secret_key": "minha-chave-super-secreta-123",
+  "status": "ok",
+  "versao": "1.0.0"
+}
+
+### 03 GET /produtos
+HTTP 200
+{
+  "dados": [
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Notebook potente para jogos",
+      "estoque": 10,
+      "id": 1,
+      "nome": "Notebook Gamer",
+      "preco": 5999.99
+    },
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Mouse sem fio ergonômico",
+      "estoque": 50,
+      "id": 2,
+      "nome": "Mouse Wireless",
+      "preco": 89.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Teclado mecânico RGB",
+      "estoque": 30,
+      "id": 3,
+      "nome": "Teclado Mecânico",
+      "preco": 299.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Monitor 27 polegadas 144hz",
+      "estoque": 15,
+      "id": 4,
+      "nome": "Monitor 27''",
+      "preco": 1899.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Headset com microfone",
+      "estoque": 25,
+      "id": 5,
+      "nome": "Headset Gamer",
+      "preco": 199.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "moveis",
+      "criado_em": "<TS>",
+      "descricao": "Cadeira ergonômica",
+      "estoque": 8,
+      "id": 6,
+      "nome": "Cadeira Gamer",
+      "preco": 1299.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Webcam 1080p",
+      "estoque": 20,
+      "id": 7,
+      "nome": "Webcam HD",
+      "preco": 249.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Hub USB 3.0 7 portas",
+      "estoque": 40,
+      "id": 8,
+      "nome": "Hub USB",
+      "preco": 79.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "SSD NVMe 1TB",
+      "estoque": 35,
+      "id": 9,
+      "nome": "SSD 1TB",
+      "preco": 449.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "vestuario",
+      "criado_em": "<TS>",
+      "descricao": "Camiseta estampa código",
+      "estoque": 100,
+      "id": 10,
+      "nome": "Camiseta Dev",
+      "preco": 59.9
+    }
+  ],
+  "sucesso": true
+}
+
+### 04 GET /produtos/1
+HTTP 200
+{
+  "dados": {
+    "ativo": 1,
+    "categoria": "informatica",
+    "criado_em": "<TS>",
+    "descricao": "Notebook potente para jogos",
+    "estoque": 10,
+    "id": 1,
+    "nome": "Notebook Gamer",
+    "preco": 5999.99
+  },
+  "sucesso": true
+}
+
+### 05 GET /produtos/999  # inexistente
+HTTP 404
+{
+  "erro": "Produto não encontrado",
+  "sucesso": false
+}
+
+### 06 GET /produtos/busca?q=Gamer
+HTTP 200
+{
+  "dados": [
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Notebook potente para jogos",
+      "estoque": 10,
+      "id": 1,
+      "nome": "Notebook Gamer",
+      "preco": 5999.99
+    },
+    {
+      "ativo": 1,
+      "categoria": "informatica",
+      "criado_em": "<TS>",
+      "descricao": "Headset com microfone",
+      "estoque": 25,
+      "id": 5,
+      "nome": "Headset Gamer",
+      "preco": 199.9
+    },
+    {
+      "ativo": 1,
+      "categoria": "moveis",
+      "criado_em": "<TS>",
+      "descricao": "Cadeira ergonômica",
+      "estoque": 8,
+      "id": 6,
+      "nome": "Cadeira Gamer",
+      "preco": 1299.9
+    }
+  ],
+  "sucesso": true,
+  "total": 3
+}
+
+### 07 GET /produtos/busca?categoria=moveis&preco_min=100&preco_max=2000
+HTTP 200
+{
+  "dados": [
+    {
+      "ativo": 1,
+      "categoria": "moveis",
+      "criado_em": "<TS>",
+      "descricao": "Cadeira ergonômica",
+      "estoque": 8,
+      "id": 6,
+      "nome": "Cadeira Gamer",
+      "preco": 1299.9
+    }
+  ],
+  "sucesso": true,
+  "total": 1
+}
+
+### 08 GET /produtos/busca?q=d%27agua  # aspas no termo quebram o SQL concatenado; deve mudar
+HTTP 500
+{
+  "erro": "near \"agua\": syntax error"
+}
+
+### 09 POST /produtos
+> {"nome": "Mousepad XL", "descricao": "Mousepad grande", "preco": 49.9, "estoque": 60, "categoria": "informatica"}
+HTTP 201
+{
+  "dados": {
+    "id": 11
+  },
+  "mensagem": "Produto criado",
+  "sucesso": true
+}
+
+### 10 POST /produtos  # falta preço
+> {"nome": "Sem preco", "estoque": 1}
+HTTP 400
+{
+  "erro": "Preço é obrigatório"
+}
+
+### 11 POST /produtos  # preço negativo
+> {"nome": "Negativo", "preco": -1, "estoque": 1}
+HTTP 400
+{
+  "erro": "Preço não pode ser negativo"
+}
+
+### 12 POST /produtos  # categoria inválida
+> {"nome": "Cat ruim", "preco": 1, "estoque": 1, "categoria": "inexistente"}
+HTTP 400
+{
+  "erro": "Categoria inválida. Válidas: ['informatica', 'moveis', 'vestuario', 'geral', 'eletronicos', 'livros']"
+}
+
+### 13 PUT /produtos/11
+> {"nome": "Mousepad XXL", "descricao": "Maior ainda", "preco": 59.9, "estoque": 55, "categoria": "informatica"}
+HTTP 200
+{
+  "mensagem": "Produto atualizado",
+  "sucesso": true
+}
+
+### 14 GET /produtos/11
+HTTP 200
+{
+  "dados": {
+    "ativo": 1,
+    "categoria": "informatica",
+    "criado_em": "<TS>",
+    "descricao": "Maior ainda",
+    "estoque": 55,
+    "id": 11,
+    "nome": "Mousepad XXL",
+    "preco": 59.9
+  },
+  "sucesso": true
+}
+
+### 15 PUT /produtos/999  # inexistente
+> {"nome": "Nada", "preco": 1, "estoque": 1}
+HTTP 404
+{
+  "erro": "Produto não encontrado"
+}
+
+### 16 DELETE /produtos/11
+HTTP 200
+{
+  "mensagem": "Produto deletado",
+  "sucesso": true
+}
+
+### 17 DELETE /produtos/999  # inexistente
+HTTP 404
+{
+  "erro": "Produto não encontrado"
+}
+
+### 18 GET /usuarios  # expõe senhas em texto puro; deve mudar
+HTTP 200
+{
+  "dados": [
+    {
+      "criado_em": "<TS>",
+      "email": "admin@loja.com",
+      "id": 1,
+      "nome": "Admin",
+      "senha": "admin123",
+      "tipo": "admin"
+    },
+    {
+      "criado_em": "<TS>",
+      "email": "joao@email.com",
+      "id": 2,
+      "nome": "João Silva",
+      "senha": "123456",
+      "tipo": "cliente"
+    },
+    {
+      "criado_em": "<TS>",
+      "email": "maria@email.com",
+      "id": 3,
+      "nome": "Maria Santos",
+      "senha": "senha123",
+      "tipo": "cliente"
+    }
+  ],
+  "sucesso": true
+}
+
+### 19 GET /usuarios/1  # expõe senha; deve mudar
+HTTP 200
+{
+  "dados": {
+    "criado_em": "<TS>",
+    "email": "admin@loja.com",
+    "id": 1,
+    "nome": "Admin",
+    "senha": "admin123",
+    "tipo": "admin"
+  },
+  "sucesso": true
+}
+
+### 20 GET /usuarios/999  # inexistente
+HTTP 404
+{
+  "erro": "Usuário não encontrado"
+}
+
+### 21 POST /usuarios
+> {"nome": "Ana Lima", "email": "ana@email.com", "senha": "segredo1"}
+HTTP 201
+{
+  "dados": {
+    "id": 4
+  },
+  "sucesso": true
+}
+
+### 22 POST /usuarios  # campos obrigatórios faltando
+> {"nome": "Sem email"}
+HTTP 400
+{
+  "erro": "Nome, email e senha são obrigatórios"
+}
+
+### 23 POST /login
+> {"email": "joao@email.com", "senha": "123456"}
+HTTP 200
+{
+  "dados": {
+    "email": "joao@email.com",
+    "id": 2,
+    "nome": "João Silva",
+    "tipo": "cliente"
+  },
+  "mensagem": "Login OK",
+  "sucesso": true
+}
+
+### 24 POST /login  # senha errada
+> {"email": "joao@email.com", "senha": "errada"}
+HTTP 401
+{
+  "erro": "Email ou senha inválidos",
+  "sucesso": false
+}
+
+### 25 POST /login  # SQL injection: hoje autentica como admin; deve virar 401
+> {"email": "admin@loja.com' --", "senha": "x"}
+HTTP 200
+{
+  "dados": {
+    "email": "admin@loja.com",
+    "id": 1,
+    "nome": "Admin",
+    "tipo": "admin"
+  },
+  "mensagem": "Login OK",
+  "sucesso": true
+}
+
+### 26 POST /pedidos
+> {"usuario_id": 2, "itens": [{"produto_id": 2, "quantidade": 2}, {"produto_id": 10, "quantidade": 1}]}
+HTTP 201
+{
+  "dados": {
+    "pedido_id": 1,
+    "total": 239.70000000000002
+  },
+  "mensagem": "Pedido criado com sucesso",
+  "sucesso": true
+}
+
+### 27 POST /pedidos  # estoque insuficiente
+> {"usuario_id": 2, "itens": [{"produto_id": 6, "quantidade": 999}]}
+HTTP 400
+{
+  "erro": "Estoque insuficiente para Cadeira Gamer",
+  "sucesso": false
+}
+
+### 28 POST /pedidos  # produto inexistente
+> {"usuario_id": 2, "itens": [{"produto_id": 999, "quantidade": 1}]}
+HTTP 400
+{
+  "erro": "Produto 999 não encontrado",
+  "sucesso": false
+}
+
+### 29 POST /pedidos  # sem itens
+> {"usuario_id": 2, "itens": []}
+HTTP 400
+{
+  "erro": "Pedido deve ter pelo menos 1 item"
+}
+
+### 30 GET /pedidos
+HTTP 200
+{
+  "dados": [
+    {
+      "criado_em": "<TS>",
+      "id": 1,
+      "itens": [
+        {
+          "preco_unitario": 89.9,
+          "produto_id": 2,
+          "produto_nome": "Mouse Wireless",
+          "quantidade": 2
+        },
+        {
+          "preco_unitario": 59.9,
+          "produto_id": 10,
+          "produto_nome": "Camiseta Dev",
+          "quantidade": 1
+        }
+      ],
+      "status": "pendente",
+      "total": 239.70000000000002,
+      "usuario_id": 2
+    }
+  ],
+  "sucesso": true
+}
+
+### 31 GET /pedidos/usuario/2
+HTTP 200
+{
+  "dados": [
+    {
+      "criado_em": "<TS>",
+      "id": 1,
+      "itens": [
+        {
+          "preco_unitario": 89.9,
+          "produto_id": 2,
+          "produto_nome": "Mouse Wireless",
+          "quantidade": 2
+        },
+        {
+          "preco_unitario": 59.9,
+          "produto_id": 10,
+          "produto_nome": "Camiseta Dev",
+          "quantidade": 1
+        }
+      ],
+      "status": "pendente",
+      "total": 239.70000000000002,
+      "usuario_id": 2
+    }
+  ],
+  "sucesso": true
+}
+
+### 32 GET /pedidos/usuario/999  # sem pedidos
+HTTP 200
+{
+  "dados": [],
+  "sucesso": true
+}
+
+### 33 GET /produtos/2  # estoque baixado pelo pedido
+HTTP 200
+{
+  "dados": {
+    "ativo": 1,
+    "categoria": "informatica",
+    "criado_em": "<TS>",
+    "descricao": "Mouse sem fio ergonômico",
+    "estoque": 48,
+    "id": 2,
+    "nome": "Mouse Wireless",
+    "preco": 89.9
+  },
+  "sucesso": true
+}
+
+### 34 PUT /pedidos/1/status
+> {"status": "aprovado"}
+HTTP 200
+{
+  "mensagem": "Status atualizado",
+  "sucesso": true
+}
+
+### 35 PUT /pedidos/1/status  # status inválido
+> {"status": "voando"}
+HTTP 400
+{
+  "erro": "Status inválido"
+}
+
+### 36 GET /relatorios/vendas
+HTTP 200
+{
+  "dados": {
+    "desconto_aplicavel": 0,
+    "faturamento_bruto": 239.7,
+    "faturamento_liquido": 239.7,
+    "pedidos_aprovados": 1,
+    "pedidos_cancelados": 0,
+    "pedidos_pendentes": 0,
+    "ticket_medio": 239.7,
+    "total_pedidos": 1
+  },
+  "sucesso": true
+}
+
+### 37 POST /admin/query  # SQL arbitrário sem autenticação; deve mudar
+> {"sql": "SELECT COUNT(*) AS total FROM produtos"}
+HTTP 200
+{
+  "dados": [
+    {
+      "total": 10
+    }
+  ],
+  "sucesso": true
+}
+
+### 38 POST /admin/query  # sem sql
+> {}
+HTTP 400
+{
+  "erro": "Query não informada"
+}
+
+### 39 POST /admin/reset-db  # apaga tudo sem autenticação; deve mudar
+HTTP 200
+{
+  "mensagem": "Banco de dados resetado",
+  "sucesso": true
+}
+
+### 40 GET /health  # contagens zeradas após o reset
+HTTP 200
+{
+  "ambiente": "producao",
+  "counts": {
+    "pedidos": 0,
+    "produtos": 0,
+    "usuarios": 0
+  },
+  "database": "connected",
+  "db_path": "loja.db",
+  "debug": true,
+  "secret_key": "minha-chave-super-secreta-123",
+  "status": "ok",
+  "versao": "1.0.0"
+}
+

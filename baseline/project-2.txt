@@ -1,0 +1,133 @@
+### 01 GET /api/admin/financial-report  # estado inicial dos seeds; rota admin sem autenticação
+HTTP 200
+[
+  {
+    "course": "Clean Architecture",
+    "revenue": 997,
+    "students": [
+      {
+        "paid": 997,
+        "student": "Leonan"
+      }
+    ]
+  },
+  {
+    "course": "Docker",
+    "revenue": 0,
+    "students": []
+  }
+]
+
+### 02 POST /api/checkout  # sucesso, usuário novo
+> {"usr": "Guilherme", "eml": "gui@fullcycle.com.br", "pwd": "senhaforte", "c_id": 2, "card": "4111222233334444"}
+HTTP 200
+{
+  "enrollment_id": 2,
+  "msg": "Sucesso"
+}
+
+### 03 POST /api/checkout  # sucesso, usuário existente
+> {"usr": "Leonan", "eml": "leonan@fullcycle.com.br", "pwd": "123", "c_id": 2, "card": "4000000000000002"}
+HTTP 200
+{
+  "enrollment_id": 3,
+  "msg": "Sucesso"
+}
+
+### 04 POST /api/checkout  # sem pwd: hoje cai na senha padrão 123456
+> {"usr": "Sem Senha", "eml": "semsenha@teste.com", "c_id": 1, "card": "4111222233334444"}
+HTTP 200
+{
+  "enrollment_id": 4,
+  "msg": "Sucesso"
+}
+
+### 05 POST /api/checkout  # pagamento recusado
+> {"usr": "João", "eml": "joao@teste.com", "pwd": "123", "c_id": 1, "card": "5111222233334444"}
+HTTP 400
+Pagamento recusado
+
+### 06 POST /api/checkout  # curso inexistente
+> {"usr": "Maria", "eml": "maria@teste.com", "pwd": "123", "c_id": 999, "card": "4111222233334444"}
+HTTP 404
+Curso não encontrado
+
+### 07 POST /api/checkout  # campos obrigatórios faltando
+> {"usr": "Incompleto", "c_id": 1}
+HTTP 400
+Bad Request
+
+### 08 GET /api/admin/financial-report  # após os checkouts; a ordem varia entre execuções (corrida de callbacks)
+HTTP 200
+[
+  {
+    "course": "Clean Architecture",
+    "revenue": 1994,
+    "students": [
+      {
+        "paid": 997,
+        "student": "Leonan"
+      },
+      {
+        "paid": 997,
+        "student": "Sem Senha"
+      }
+    ]
+  },
+  {
+    "course": "Docker",
+    "revenue": 994,
+    "students": [
+      {
+        "paid": 497,
+        "student": "Guilherme"
+      },
+      {
+        "paid": 497,
+        "student": "Leonan"
+      }
+    ]
+  }
+]
+
+### 09 DELETE /api/users/1  # hoje deixa matrículas e pagamentos órfãos
+HTTP 200
+Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco.
+
+### 10 DELETE /api/users/999  # inexistente: hoje responde 200 mesmo assim
+HTTP 200
+Usuário deletado, mas as matrículas e pagamentos ficaram sujos no banco.
+
+### 11 GET /api/admin/financial-report  # após o delete: aluno vira Unknown
+HTTP 200
+[
+  {
+    "course": "Clean Architecture",
+    "revenue": 1994,
+    "students": [
+      {
+        "paid": 997,
+        "student": "Sem Senha"
+      },
+      {
+        "paid": 997,
+        "student": "Unknown"
+      }
+    ]
+  },
+  {
+    "course": "Docker",
+    "revenue": 994,
+    "students": [
+      {
+        "paid": 497,
+        "student": "Guilherme"
+      },
+      {
+        "paid": 497,
+        "student": "Unknown"
+      }
+    ]
+  }
+]
+

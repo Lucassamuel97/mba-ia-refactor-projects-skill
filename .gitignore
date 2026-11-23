@@ -10,3 +10,6 @@ venv/
 # SQLite
 *.db
 instance/
+
+# Logs de servidor do smoke test (mudam a cada execução)
+baseline/*.server.log
