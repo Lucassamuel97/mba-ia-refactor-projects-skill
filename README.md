@@ -11,7 +11,7 @@ O enunciado completo está em [desafio.md](desafio.md).
 | 0 | Linha de base | Respostas de todos os endpoints dos 3 projetos, gravadas antes de qualquer mudança | Concluída |
 | 1 | Análise manual | Problemas de cada projeto, documentados na seção "Análise Manual" | Concluída |
 | 2 | Criação da skill | `SKILL.md` e arquivos de referência em `code-smells-project/.claude/skills/refactor-arch/` | Concluída |
-| 3 | Execução no projeto 1 | `code-smells-project` refatorado e `reports/audit-project-1.md` | Executada e validada; falta commitar |
+| 3 | Execução no projeto 1 | `code-smells-project` refatorado e `reports/audit-project-1.md` | Concluída |
 | 4 | Execução no projeto 2 | `ecommerce-api-legacy` refatorado e `reports/audit-project-2.md` | Pendente |
 | 5 | Execução no projeto 3 | `task-manager-api` refatorado e `reports/audit-project-3.md` | Pendente |
 | 6 | Documentação final | As quatro seções deste README preenchidas, no repositório público | Pendente |
