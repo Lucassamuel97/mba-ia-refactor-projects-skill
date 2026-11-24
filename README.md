@@ -13,8 +13,8 @@ O enunciado completo está em [desafio.md](desafio.md).
 | 2 | Criação da skill | `SKILL.md` e arquivos de referência em `code-smells-project/.claude/skills/refactor-arch/` | Concluída |
 | 3 | Execução no projeto 1 | `code-smells-project` refatorado e `reports/audit-project-1.md` | Concluída |
 | 4 | Execução no projeto 2 | `ecommerce-api-legacy` refatorado e `reports/audit-project-2.md` | Concluída |
-| 5 | Execução no projeto 3 | `task-manager-api` refatorado e `reports/audit-project-3.md` | Pendente |
-| 6 | Documentação final | As quatro seções deste README preenchidas, no repositório público | Pendente |
+| 5 | Execução no projeto 3 | `task-manager-api` refatorado e `reports/audit-project-3.md` | Concluída |
+| 6 | Documentação final | As quatro seções deste README preenchidas, no repositório público | Documentação pronta; falta publicar na `main` |
 
 ### Etapa 0 — Linha de base
 
@@ -47,27 +47,27 @@ Para cada um dos 3 projetos:
 
 ### Etapas 3, 4 e 5 — Execução nos projetos
 
-Para cada projeto (nos projetos 2 e 3, depois de copiar a pasta da skill para dentro dele):
+Para cada projeto (nos projetos 2 e 3, depois de copiar a pasta da skill para dentro dele). Os três projetos cumpriram todos os itens; o detalhe está em [Resultados](#resultados).
 
-- [ ] Fase 1 detecta linguagem, framework e domínio corretamente
-- [ ] Fase 2 encontra no mínimo 5 findings, com pelo menos 1 CRITICAL ou HIGH
-- [ ] Fase 2 pausa e pede confirmação
-- [ ] Relatório da Fase 2 salvo em `reports/audit-project-<n>.md`
-- [ ] Fase 3 cria a estrutura MVC, com config extraída e error handling centralizado
-- [ ] Aplicação inicia sem erros e os endpoints originais respondem
-- [ ] Checklist de validação do [enunciado](desafio.md#validação) preenchido
-- [ ] Código refatorado commitado
+- [x] Fase 1 detecta linguagem, framework e domínio corretamente
+- [x] Fase 2 encontra no mínimo 5 findings, com pelo menos 1 CRITICAL ou HIGH
+- [x] Fase 2 pausa e pede confirmação
+- [x] Relatório da Fase 2 salvo em `reports/audit-project-<n>.md`
+- [x] Fase 3 cria a estrutura MVC, com config extraída e error handling centralizado
+- [x] Aplicação inicia sem erros e os endpoints originais respondem
+- [x] Checklist de validação do [enunciado](desafio.md#validação) preenchido
+- [x] Código refatorado commitado
 
 No projeto 1, a Fase 2 também precisa encontrar pelo menos 5 dos problemas da análise manual.
 
 ### Etapa 6 — Documentação final
 
-- [ ] Seção "Análise Manual" preenchida
-- [ ] Seção "Construção da Skill" preenchida
-- [ ] Seção "Resultados" preenchida
-- [ ] Seção "Como Executar" preenchida
-- [ ] A mesma versão da skill está nos 3 projetos
-- [ ] Tudo publicado no fork público
+- [x] Seção "Análise Manual" preenchida
+- [x] Seção "Construção da Skill" preenchida
+- [x] Seção "Resultados" preenchida
+- [x] Seção "Como Executar" preenchida
+- [x] A mesma versão da skill está nos 3 projetos (as três pastas são idênticas)
+- [ ] Tudo publicado na branch `main` do fork público
 
 ### Critérios de aceite
 
@@ -246,7 +246,9 @@ Antes das execuções completas, as duas fases de leitura foram ensaiadas no pro
 
 - **Projeto 1:** a execução completa funcionou na primeira tentativa. O único ajuste na skill veio do resumo final: a execução reportou três findings "resolvidos com ressalva", categoria que o template não previa, e o template ganhou a seção `Partial`.
 - **Projeto 2:** a mesma skill, copiada sem alteração, funcionou na primeira tentativa em Node.js/Express. Nenhum ajuste foi necessário.
-- **Projeto 3:** a registrar na etapa 5.
+- **Projeto 3:** a mesma skill, de novo sem alteração, funcionou na primeira tentativa em um projeto já parcialmente organizado. Ela manteve `models/`, `routes/`, `services/` e `utils/` e criou só as camadas que faltavam.
+
+No total, a skill precisou de uma única alteração depois de escrita (a seção `Partial` do template), e as três execuções completas passaram na primeira tentativa.
 
 ## Resultados
 
@@ -256,7 +258,7 @@ Antes das execuções completas, as duas fases de leitura foram ensaiadas no pro
 |---|---|---|---|---|---|---|---|
 | code-smells-project | 6 | 6 | 4 | 4 | 20 | 19 (3 parciais), 1 adiado | [audit-project-1.md](reports/audit-project-1.md) |
 | ecommerce-api-legacy | 5 | 6 | 4 | 4 | 19 | 19 (3 parciais), nenhum adiado | [audit-project-2.md](reports/audit-project-2.md) |
-| task-manager-api | | | | | | pendente (etapa 5) | |
+| task-manager-api | 4 | 3 | 7 | 5 | 19 | 18 (1 parcial), 1 adiado | [audit-project-3.md](reports/audit-project-3.md) |
 
 ### Projeto 1 — code-smells-project
 
@@ -428,9 +430,100 @@ Fase 3 — Refatoração
 - [x] Aplicação inicia sem erros
 - [x] Endpoints originais respondem corretamente (as duas rotas protegidas, com o token)
 
-### Projeto 3
+### Projeto 3 — task-manager-api
 
-Pendente (etapa 5). As observações sobre o comportamento da skill em stacks diferentes entram depois dessa execução.
+O teste com um projeto que já tinha camadas. A skill classificou a arquitetura como "parcialmente em camadas" e adaptou a estratégia: manteve as pastas existentes, criou `controllers/`, `config/` e `middlewares/`, tirou a lógica de dentro das rotas e deu a categorias e status arquivos próprios. O relatório cobriu os 17 problemas da análise manual.
+
+**Findings resolvidos:** 18 de 19.
+
+- **Adiado:** autenticação obrigatória e restrição do campo `role`, porque mudam o contrato da API. O `token` do login segue sendo um valor de demonstração.
+- **Parcial:** o `NotificationService` foi corrigido (credenciais lidas do ambiente, desligado sem elas), mas continua sem nenhum chamador. Ligá-lo à atribuição de tarefas passaria a enviar email, o que é funcionalidade nova.
+
+**APIs deprecated:** 3 encontradas e substituídas. `datetime.utcnow()` deu lugar a um helper que mantém UTC sem fuso; `Model.query.get()` e a interface `Model.query` deram lugar a `db.session.get()` e `db.select()`. O seed e o boot rodam sem avisos mesmo com `-W error::DeprecationWarning`.
+
+**Estrutura antes e depois:**
+
+```
+ANTES                         DEPOIS
+app.py                        app.py                (composition root)
+database.py                   database.py           db, init_app, commit_session
+seed.py                       seed.py
+models/     task, user,       config/settings.py                                  (nova)
+            category          models/               task, user, category
+routes/     task, user,       services/             task, user, category, report, notification
+            report            controllers/          task, user, category, report, status, validation  (nova)
+services/   notification      routes/               task, user, category, report, status
+utils/      helpers           middlewares/          errors, error_handler          (nova)
+                              utils/helpers.py
+                              .env.example
+```
+
+As rotas passaram de 733 linhas com toda a lógica para 57 linhas de mapeamento. A regra foi para os services e os models, que agora são usados: `Task.is_overdue` e as constantes de `helpers.py` existiam e ninguém chamava.
+
+**Validação:**
+
+- **Boot:** `python seed.py` e `python app.py` sobem sem variável de ambiente nem `.env`, com debug desligado.
+- **Smoke test da skill:** 124 requisições nas 22 rotas; 100 respostas idênticas às originais e 24 mudanças intencionais.
+- **Linha de base independente** (`bash baseline/run.sh 3`): 36 de 40 respostas idênticas a [baseline/project-3.txt](baseline/project-3.txt). As 4 diferentes são exatamente as marcadas como "deve mudar": o hash da senha saiu das respostas.
+- **Nova varredura:** nenhum `utcnow()` do `datetime`, nenhum `Model.query`, nenhum `except:` genérico, nenhum segredo literal; rotas e controllers não tocam o ORM, e models e services não importam o Flask. O MD5 só aparece para conferir hashes antigos no login, antes de regravá-los.
+- **Queries:** `GET /tasks` passou a fazer 1 query; `GET /users` e `GET /categories`, 2.
+
+Log do boot após a refatoração:
+
+```
+ * Serving Flask app 'app'
+ * Debug mode: off
+ * Running on http://127.0.0.1:5000
+INFO werkzeug: "GET / HTTP/1.1" 200 -
+INFO werkzeug: "GET /health HTTP/1.1" 200 -
+```
+
+**Mudanças de comportamento:**
+
+- `GET /users/<id>`, `POST /users`, `PUT /users/<id>` e `POST /login` deixaram de devolver o hash da senha.
+- As senhas são gravadas com scrypt; hashes MD5 antigos continuam válidos e são regravados no primeiro login.
+- Erros não tratados respondem 500 em JSON, no lugar da página do debugger do Werkzeug.
+- Entradas que causavam erro 500 (prioridade em texto, `priority=abc` na busca, corpo que não é objeto) respondem 400.
+- Entradas inválidas que eram gravadas (prioridade não inteira, nome vazio, cor fora do formato `#RRGGBB`) passam a ser recusadas com 400.
+- O servidor passa a escutar em `127.0.0.1` por padrão, ajustável por `APP_HOST`.
+- `marshmallow` e `requests`, declarados e nunca importados, saíram do `requirements.txt`.
+
+**Checklist de validação:**
+
+Fase 1 — Análise
+- [x] Linguagem detectada corretamente (Python)
+- [x] Framework detectado corretamente (Flask 3.0.0, com Flask-SQLAlchemy 3.1.1)
+- [x] Domínio da aplicação descrito corretamente (API de gerenciamento de tarefas com relatórios e login)
+- [x] Número de arquivos analisados condiz com a realidade (15 arquivos, cerca de 1.160 linhas, 22 rotas)
+
+Fase 2 — Auditoria
+- [x] Relatório segue o template definido nos arquivos de referência
+- [x] Cada finding tem arquivo e linhas exatos
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados (19)
+- [x] Detecção de APIs deprecated incluída (`Deprecated APIs: 3 encontradas`)
+- [x] Skill pausa e pede confirmação antes da Fase 3
+
+Fase 3 — Refatoração
+- [x] Estrutura de diretórios segue padrão MVC
+- [x] Configuração extraída para módulo de config (sem hardcoded)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado
+- [x] Entry point claro
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente
+
+### Comportamento da skill em stacks diferentes
+
+- **A mesma skill nos três.** As três pastas `.claude/skills/refactor-arch/` são idênticas, e nenhuma execução exigiu ajuste para a stack.
+- **A estratégia seguiu o ponto de partida, não a linguagem.** No projeto 1 (camadas só no nome) e no projeto 2 (monolito), a skill criou a estrutura completa. No projeto 3, manteve o que já existia e criou só as três camadas que faltavam.
+- **Mesmas camadas, mecanismos de cada framework.** Em Flask: blueprints, `errorhandler` e conexão por requisição em `flask.g`. Em Express: routers, middleware de erro, injeção por construtor e `async/await` no lugar dos callbacks.
+- **Detalhes de stack foram respeitados.** O banco em memória do projeto 2 manteve uma conexão única, com fila para as transações. No projeto 3, a skill usou o ORM existente em vez de introduzir SQL, e trocou `utcnow()` sem alterar o formato das datas nas respostas.
+- **Convenções de cada projeto foram mantidas.** Identificadores em português no projeto 1 e em inglês nos outros dois; `snake_case` em Python e `camelCase` em JavaScript; `src/` só onde já existia.
+- **APIs deprecated só onde havia.** O relatório registrou `none detected` nos projetos 1 e 2 e 3 ocorrências no projeto 3.
+- **Decisões de segurança consistentes.** Nos três, senhas passaram a usar hash com salt, segredos foram para o ambiente e respostas deixaram de vazar dados. Rotas administrativas e destrutivas ganharam token nos projetos 1 e 2; autenticação obrigatória nas rotas de negócio ficou adiada nos três, por mudar o contrato.
 
 ## Como Executar
 
