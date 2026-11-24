@@ -2,7 +2,7 @@
 
 Entrega do desafio de Skills do MBA da Full Cycle: uma skill do Claude Code que analisa, audita e refatora um projeto para o padrão MVC, aplicada a três projetos legados.
 
-O enunciado completo está em [desafio.md](desafio.md).
+O enunciado completo está em [desafio.md](desafio.md). Para instalar e usar a skill em outro projeto, veja [USANDO-EM-OUTROS-PROJETOS.md](USANDO-EM-OUTROS-PROJETOS.md).
 
 ## Etapas da entrega
 
