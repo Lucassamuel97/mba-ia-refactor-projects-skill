@@ -14,7 +14,7 @@ O enunciado completo está em [desafio.md](desafio.md).
 | 3 | Execução no projeto 1 | `code-smells-project` refatorado e `reports/audit-project-1.md` | Concluída |
 | 4 | Execução no projeto 2 | `ecommerce-api-legacy` refatorado e `reports/audit-project-2.md` | Concluída |
 | 5 | Execução no projeto 3 | `task-manager-api` refatorado e `reports/audit-project-3.md` | Concluída |
-| 6 | Documentação final | As quatro seções deste README preenchidas, no repositório público | Documentação pronta; falta publicar na `main` |
+| 6 | Documentação final | As quatro seções deste README preenchidas, no repositório público | Concluída |
 
 ### Etapa 0 — Linha de base
 
@@ -67,7 +67,7 @@ No projeto 1, a Fase 2 também precisa encontrar pelo menos 5 dos problemas da a
 - [x] Seção "Resultados" preenchida
 - [x] Seção "Como Executar" preenchida
 - [x] A mesma versão da skill está nos 3 projetos (as três pastas são idênticas)
-- [ ] Tudo publicado na branch `main` do fork público
+- [x] Tudo publicado na branch `main` do fork público
 
 ### Critérios de aceite
 
