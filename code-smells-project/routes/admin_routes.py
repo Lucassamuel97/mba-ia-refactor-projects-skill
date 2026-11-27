@@ -1,15 +1,9 @@
-"""Rotas administrativas. Todas exigem o token de administrador."""
+"""Rotas administrativas (somente admin). Não existe rota que execute SQL recebido."""
 from flask import Blueprint
 
-from middlewares.auth import exigir_token_admin
 
-
-def criar_blueprint(controller):
-    blueprint = Blueprint("admin", __name__)
-    blueprint.add_url_rule(
-        "/admin/reset-db", "resetar_banco", exigir_token_admin(controller.resetar_banco), methods=["POST"]
-    )
-    blueprint.add_url_rule(
-        "/admin/query", "executar_query", exigir_token_admin(controller.executar_query), methods=["POST"]
-    )
-    return blueprint
+def criar_admin_routes(controller, auth):
+    bp = Blueprint("admin", __name__)
+    bp.add_url_rule("/admin/reset-db", view_func=auth.somente_admin(controller.resetar_banco),
+                    methods=["POST"])
+    return bp

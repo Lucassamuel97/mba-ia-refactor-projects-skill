@@ -3,20 +3,19 @@ import sqlite3
 
 from flask import current_app, g
 
-ErroBancoDeDados = sqlite3.Error
-
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(current_app.config["DATABASE_PATH"])
-        g.db.row_factory = sqlite3.Row
+        conexao = sqlite3.connect(current_app.config["DATABASE_PATH"])
+        conexao.row_factory = sqlite3.Row
+        g.db = conexao
     return g.db
 
 
 def close_db(_erro=None):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
+    conexao = g.pop("db", None)
+    if conexao is not None:
+        conexao.close()
 
 
 def init_app(app):

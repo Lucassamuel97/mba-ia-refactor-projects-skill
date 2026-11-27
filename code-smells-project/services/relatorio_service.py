@@ -1,11 +1,11 @@
-"""Regras do relatório de vendas."""
+"""Relatório de vendas e política de desconto sobre o faturamento."""
 
-# (faturamento mínimo, percentual de desconto), da maior faixa para a menor.
-FAIXAS_DE_DESCONTO = ((10000, 0.1), (5000, 0.05), (1000, 0.02))
+# (faturamento mínimo, exclusivo; percentual de desconto), da maior faixa para a menor
+FAIXAS_DESCONTO = ((10000, 0.1), (5000, 0.05), (1000, 0.02))
 
 
 def calcular_desconto(faturamento):
-    for faturamento_minimo, percentual in FAIXAS_DE_DESCONTO:
+    for faturamento_minimo, percentual in FAIXAS_DESCONTO:
         if faturamento > faturamento_minimo:
             return faturamento * percentual
     return 0
@@ -15,7 +15,7 @@ class RelatorioService:
     def __init__(self, pedido_model):
         self._pedido_model = pedido_model
 
-    def relatorio_vendas(self):
+    def vendas(self):
         resumo = self._pedido_model.resumo_vendas()
         total_pedidos = resumo["total_pedidos"]
         faturamento = resumo["faturamento"]

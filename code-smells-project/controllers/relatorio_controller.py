@@ -1,4 +1,4 @@
-"""Fluxo HTTP das rotas de relatórios."""
+"""Fluxo HTTP das rotas de relatório."""
 from flask import jsonify
 
 
@@ -7,5 +7,4 @@ class RelatorioController:
         self._relatorio_service = relatorio_service
 
     def vendas(self):
-        relatorio = self._relatorio_service.relatorio_vendas()
-        return jsonify({"dados": relatorio, "sucesso": True}), 200
+        return jsonify({"dados": self._relatorio_service.vendas(), "sucesso": True}), 200

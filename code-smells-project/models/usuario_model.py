@@ -1,14 +1,25 @@
-"""Acesso a dados de usuários."""
+"""Acesso a dados e regras da entidade usuário."""
+from werkzeug.security import check_password_hash, generate_password_hash
 
-TIPO_CLIENTE = "cliente"
+TIPO_PADRAO = "cliente"
+TIPO_ADMIN = "admin"
 
-# Campos públicos de um usuário. A senha nunca entra em respostas.
-_CAMPOS_PUBLICOS = ("id", "nome", "email", "tipo", "criado_em")
-_COLUNAS_PUBLICAS = ", ".join(_CAMPOS_PUBLICOS)
+_COLUNAS_PUBLICAS = "id, nome, email, tipo, criado_em"
 
 
 def _para_dict(linha):
-    return {campo: linha[campo] for campo in _CAMPOS_PUBLICOS}
+    # A senha nunca faz parte da representação pública do usuário.
+    return {
+        "id": linha["id"],
+        "nome": linha["nome"],
+        "email": linha["email"],
+        "tipo": linha["tipo"],
+        "criado_em": linha["criado_em"],
+    }
+
+
+def _para_dict_login(linha):
+    return {"id": linha["id"], "nome": linha["nome"], "email": linha["email"], "tipo": linha["tipo"]}
 
 
 class UsuarioModel:
@@ -28,40 +39,30 @@ class UsuarioModel:
         return _para_dict(linha) if linha else None
 
     def existe(self, usuario_id):
-        linha = self._obter_conexao().execute(
+        return self._obter_conexao().execute(
             "SELECT 1 FROM usuarios WHERE id = ?", (usuario_id,)
-        ).fetchone()
-        return linha is not None
+        ).fetchone() is not None
 
-    def existe_email(self, email):
-        linha = self._obter_conexao().execute(
+    def email_cadastrado(self, email):
+        return self._obter_conexao().execute(
             "SELECT 1 FROM usuarios WHERE email = ?", (email,)
+        ).fetchone() is not None
+
+    def autenticar(self, email, senha):
+        """Devolve os dados de login do usuário se email e senha conferem; senão None."""
+        linha = self._obter_conexao().execute(
+            "SELECT id, nome, email, tipo, senha FROM usuarios WHERE email = ?", (email,)
         ).fetchone()
-        return linha is not None
+        if linha is None or not check_password_hash(linha["senha"], senha):
+            return None
+        return _para_dict_login(linha)
 
-    def listar_credenciais(self, email=None):
-        """Uso interno da autenticação: inclui o hash da senha."""
-        consulta = "SELECT id, nome, email, tipo, senha FROM usuarios"
-        parametros = []
-        if email is not None:
-            consulta += " WHERE email = ?"
-            parametros.append(email)
-        linhas = self._obter_conexao().execute(consulta + " ORDER BY id", parametros).fetchall()
-        return [dict(linha) for linha in linhas]
-
-    def criar(self, nome, email, senha_hash):
-        db = self._obter_conexao()
-        with db:
-            cursor = db.execute(
+    def criar(self, nome, email, senha):
+        """Cadastro público: o tipo é sempre o padrão, independentemente do que foi enviado."""
+        conexao = self._obter_conexao()
+        with conexao:
+            cursor = conexao.execute(
                 "INSERT INTO usuarios (nome, email, senha, tipo) VALUES (?, ?, ?, ?)",
-                (nome, email, senha_hash, TIPO_CLIENTE),
+                (nome, email, generate_password_hash(senha), TIPO_PADRAO),
             )
         return cursor.lastrowid
-
-    def atualizar_senha(self, usuario_id, senha_hash):
-        db = self._obter_conexao()
-        with db:
-            db.execute("UPDATE usuarios SET senha = ? WHERE id = ?", (senha_hash, usuario_id))
-
-    def contar(self):
-        return self._obter_conexao().execute("SELECT COUNT(*) FROM usuarios").fetchone()[0]

@@ -1,4 +1,4 @@
-"""Composition root: monta as camadas da aplicação e inicia o servidor."""
+"""Composition root: cria a aplicação, liga as camadas e inicia o servidor."""
 import logging
 
 from flask import Flask
@@ -11,64 +11,61 @@ from controllers.produto_controller import ProdutoController
 from controllers.relatorio_controller import RelatorioController
 from controllers.sistema_controller import SistemaController
 from controllers.usuario_controller import UsuarioController
-from database import connection, schema, seed
-from middlewares.error_handler import registrar_tratadores_de_erro
+from database import connection, schema
+from middlewares.auth import Autenticacao
+from middlewares.error_handler import registrar_tratamento_de_erros
 from models.admin_model import AdminModel
 from models.pedido_model import PedidoModel
 from models.produto_model import ProdutoModel
+from models.sistema_model import SistemaModel
 from models.usuario_model import UsuarioModel
-from routes import admin_routes, pedido_routes, produto_routes, relatorio_routes, sistema_routes, usuario_routes
-from services import senha_service
+from routes.admin_routes import criar_admin_routes
+from routes.pedido_routes import criar_pedido_routes
+from routes.produto_routes import criar_produto_routes
+from routes.relatorio_routes import criar_relatorio_routes
+from routes.sistema_routes import criar_sistema_routes
+from routes.usuario_routes import criar_usuario_routes
 from services.notificacao_service import NotificacaoService
 from services.pedido_service import PedidoService
 from services.relatorio_service import RelatorioService
-from services.usuario_service import UsuarioService
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def create_app(settings=Settings):
     app = Flask(__name__)
     app.config.from_object(settings)
-    logging.basicConfig(
-        level=getattr(logging, app.config["LOG_LEVEL"], logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
-    CORS(app)
+    CORS(app, origins=app.config["CORS_ORIGINS"])
+
     connection.init_app(app)
+    with app.app_context():
+        schema.init_db(connection.get_db())
 
-    produto_model = ProdutoModel(connection.get_db)
-    usuario_model = UsuarioModel(connection.get_db)
-    pedido_model = PedidoModel(connection.get_db)
-    admin_model = AdminModel(connection.get_db)
+    obter_conexao = connection.get_db
+    produto_model = ProdutoModel(obter_conexao)
+    usuario_model = UsuarioModel(obter_conexao)
+    pedido_model = PedidoModel(obter_conexao)
+    admin_model = AdminModel(obter_conexao)
+    sistema_model = SistemaModel(obter_conexao)
 
-    usuario_service = UsuarioService(usuario_model, senha_service)
+    auth = Autenticacao(usuario_model)
     pedido_service = PedidoService(pedido_model, produto_model, usuario_model, NotificacaoService())
     relatorio_service = RelatorioService(pedido_model)
 
-    with app.app_context():
-        db = connection.get_db()
-        schema.criar_tabelas(db)
-        seed.popular_se_vazio(db, senha_service.gerar_hash)
-        usuario_service.migrar_senhas_legadas()
+    app.register_blueprint(criar_produto_routes(ProdutoController(produto_model), auth))
+    app.register_blueprint(criar_usuario_routes(UsuarioController(usuario_model, auth), auth))
+    app.register_blueprint(criar_pedido_routes(PedidoController(pedido_service, pedido_model, auth), auth))
+    app.register_blueprint(criar_relatorio_routes(RelatorioController(relatorio_service), auth))
+    app.register_blueprint(criar_sistema_routes(SistemaController(sistema_model)))
+    app.register_blueprint(criar_admin_routes(AdminController(admin_model), auth))
 
-    # A ordem de registro é a mesma das rotas originais.
-    blueprints = (
-        produto_routes.criar_blueprint(ProdutoController(produto_model)),
-        usuario_routes.criar_blueprint(UsuarioController(usuario_model, usuario_service)),
-        pedido_routes.criar_blueprint(PedidoController(pedido_model, pedido_service)),
-        relatorio_routes.criar_blueprint(RelatorioController(relatorio_service)),
-        sistema_routes.criar_blueprint(SistemaController(produto_model, usuario_model, pedido_model)),
-        admin_routes.criar_blueprint(AdminController(admin_model)),
-    )
-    for blueprint in blueprints:
-        app.register_blueprint(blueprint)
-    registrar_tratadores_de_erro(app)
+    registrar_tratamento_de_erros(app)
     return app
 
 
 app = create_app()
 
 if __name__ == "__main__":
-    logger.info("Servidor iniciado em http://%s:%s", app.config["HOST"], app.config["PORT"])
+    logger.info("SERVIDOR INICIADO - rodando em http://localhost:%s", app.config["PORT"])
     app.run(host=app.config["HOST"], port=app.config["PORT"], debug=app.config["DEBUG"])

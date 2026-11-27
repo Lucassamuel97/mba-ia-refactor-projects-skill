@@ -1,8 +1,4 @@
-"""Notificações de pedidos.
-
-O envio ainda é simulado por log, como no código original. Para integrar um
-provedor real, basta entregar ao PedidoService outro objeto com os mesmos métodos.
-"""
+"""Notificações de pedido. Hoje registradas em log; o envio real entra aqui."""
 import logging
 
 from models.pedido_model import STATUS_APROVADO, STATUS_CANCELADO

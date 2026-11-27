@@ -1,64 +1,47 @@
-"""Fluxo HTTP das rotas de usuários e de login."""
+"""Fluxo HTTP das rotas de usuário e login."""
 import logging
-import re
 
-from flask import jsonify
+from flask import jsonify, request
 
-from controllers.validacao import MENSAGEM_DADOS_INVALIDOS, exigir_texto, ler_corpo_json
-from middlewares.erros import ErroNaoEncontrado, ErroValidacao
+from controllers import validacao
+from middlewares.erros import ErroConflito, ErroNaoAutenticado, ErroNaoEncontrado
 
 logger = logging.getLogger(__name__)
 
-FORMATO_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+$")
-
 
 class UsuarioController:
-    def __init__(self, usuario_model, usuario_service):
+    def __init__(self, usuario_model, autenticacao):
         self._usuario_model = usuario_model
-        self._usuario_service = usuario_service
+        self._autenticacao = autenticacao
 
     def listar(self):
-        usuarios = self._usuario_model.listar()
-        return jsonify({"dados": usuarios, "sucesso": True}), 200
+        return jsonify({"dados": self._usuario_model.listar(), "sucesso": True}), 200
 
     def buscar_por_id(self, usuario_id):
+        self._autenticacao.garantir_dono_ou_admin(usuario_id)
         usuario = self._usuario_model.buscar_por_id(usuario_id)
-        if usuario is None:
+        if not usuario:
             raise ErroNaoEncontrado("Usuário não encontrado")
         return jsonify({"dados": usuario, "sucesso": True}), 200
 
     def criar(self):
-        dados = ler_corpo_json()
-        if not dados:
-            raise ErroValidacao(MENSAGEM_DADOS_INVALIDOS)
-
-        nome = dados.get("nome", "")
-        email = dados.get("email", "")
-        senha = dados.get("senha", "")
-        if not nome or not email or not senha:
-            raise ErroValidacao("Nome, email e senha são obrigatórios")
-        for valor in (nome, email, senha):
-            exigir_texto(valor, "Nome, email e senha devem ser texto")
-        if not FORMATO_EMAIL.match(email):
-            raise ErroValidacao("Email inválido")
-
-        usuario_id = self._usuario_service.criar_usuario(nome, email, senha)
-        logger.info("Usuário criado com ID: %s", usuario_id)
-        return jsonify({"dados": {"id": usuario_id}, "sucesso": True}), 201
+        nome, email, senha = validacao.validar_usuario(request.get_json(silent=True))
+        if self._usuario_model.email_cadastrado(email):
+            raise ErroConflito("Email já cadastrado")
+        novo_id = self._usuario_model.criar(nome, email, senha)
+        logger.info("Usuário criado: id %s", novo_id)
+        return jsonify({"dados": {"id": novo_id}, "sucesso": True}), 201
 
     def login(self):
-        dados = ler_corpo_json()
-        email = dados.get("email", "")
-        senha = dados.get("senha", "")
-        if not email or not senha:
-            raise ErroValidacao("Email e senha são obrigatórios")
-        for valor in (email, senha):
-            exigir_texto(valor, "Email e senha devem ser texto")
-
-        usuario = self._usuario_service.autenticar(email, senha)
+        email, senha = validacao.validar_credenciais(request.get_json(silent=True))
+        usuario = self._usuario_model.autenticar(email, senha)
         if usuario is None:
             logger.info("Login falhou")
-            return jsonify({"erro": "Email ou senha inválidos", "sucesso": False}), 401
-
-        logger.info("Login bem-sucedido: usuário %s", usuario["id"])
-        return jsonify({"dados": usuario, "sucesso": True, "mensagem": "Login OK"}), 200
+            raise ErroNaoAutenticado("Email ou senha inválidos", sucesso=False)
+        logger.info("Login bem-sucedido: usuario %s", usuario["id"])
+        return jsonify({
+            "dados": usuario,
+            "sucesso": True,
+            "mensagem": "Login OK",
+            "token": self._autenticacao.emitir_token(usuario["id"]),
+        }), 200

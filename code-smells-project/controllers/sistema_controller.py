@@ -1,23 +1,17 @@
-"""Fluxo HTTP das rotas de apresentação e de saúde da API."""
-import logging
+"""Rotas institucionais: índice e health check."""
+from flask import jsonify
 
-from flask import current_app, jsonify
-
-from database.connection import ErroBancoDeDados
-
-logger = logging.getLogger(__name__)
+from config.settings import AMBIENTE, VERSAO_API
 
 
 class SistemaController:
-    def __init__(self, produto_model, usuario_model, pedido_model):
-        self._produto_model = produto_model
-        self._usuario_model = usuario_model
-        self._pedido_model = pedido_model
+    def __init__(self, sistema_model):
+        self._sistema_model = sistema_model
 
     def index(self):
         return jsonify({
             "mensagem": "Bem-vindo à API da Loja",
-            "versao": current_app.config["VERSAO"],
+            "versao": VERSAO_API,
             "endpoints": {
                 "produtos": "/produtos",
                 "usuarios": "/usuarios",
@@ -28,21 +22,11 @@ class SistemaController:
             },
         })
 
-    def health_check(self):
-        try:
-            contagens = {
-                "produtos": self._produto_model.contar(),
-                "usuarios": self._usuario_model.contar(),
-                "pedidos": self._pedido_model.contar(),
-            }
-        except ErroBancoDeDados:
-            logger.exception("Health check: banco de dados indisponível")
-            return jsonify({"status": "erro", "detalhes": "Banco de dados indisponível"}), 500
-
+    def health(self):
         return jsonify({
             "status": "ok",
             "database": "connected",
-            "counts": contagens,
-            "versao": current_app.config["VERSAO"],
-            "ambiente": current_app.config["AMBIENTE"],
+            "counts": self._sistema_model.contagens(),
+            "versao": VERSAO_API,
+            "ambiente": AMBIENTE,
         }), 200

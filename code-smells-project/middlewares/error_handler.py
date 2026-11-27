@@ -1,4 +1,4 @@
-"""Tratamento de erro central."""
+"""Tratamento de erro central: exceções de domínio viram resposta, o resto vira 500 genérico."""
 import logging
 
 from flask import jsonify
@@ -8,20 +8,17 @@ from middlewares.erros import ErroAplicacao
 
 logger = logging.getLogger(__name__)
 
-MENSAGEM_ERRO_INTERNO = "Erro interno do servidor"
 
-
-def registrar_tratadores_de_erro(app):
+def registrar_tratamento_de_erros(app):
     @app.errorhandler(ErroAplicacao)
-    def tratar_erro_aplicacao(erro):
+    def tratar_erro_de_aplicacao(erro):
         return jsonify({"erro": erro.mensagem, **erro.extras}), erro.status_code
 
     @app.errorhandler(HTTPException)
     def tratar_erro_http(erro):
-        # Mantém as respostas padrão do framework (404 de rota, 405).
-        return erro
+        return erro  # respostas padrão do Flask (rota inexistente, método não permitido)
 
     @app.errorhandler(Exception)
-    def tratar_erro_inesperado(erro):
+    def tratar_erro_inesperado(_erro):
         logger.exception("Erro não tratado")
-        return jsonify({"erro": MENSAGEM_ERRO_INTERNO}), 500
+        return jsonify({"erro": "Erro interno do servidor"}), 500

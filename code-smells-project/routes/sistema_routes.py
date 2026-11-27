@@ -1,9 +1,9 @@
-"""Rotas de apresentação e de saúde da API."""
+"""Rotas institucionais públicas."""
 from flask import Blueprint
 
 
-def criar_blueprint(controller):
-    blueprint = Blueprint("sistema", __name__)
-    blueprint.add_url_rule("/", "index", controller.index, methods=["GET"])
-    blueprint.add_url_rule("/health", "health_check", controller.health_check, methods=["GET"])
-    return blueprint
+def criar_sistema_routes(controller):
+    bp = Blueprint("sistema", __name__)
+    bp.add_url_rule("/", view_func=controller.index, methods=["GET"])
+    bp.add_url_rule("/health", view_func=controller.health, methods=["GET"])
+    return bp
