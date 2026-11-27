@@ -89,7 +89,7 @@ A severidade segue a escala do [enunciado](desafio.md#definição-de-severidades
 | Projeto | CRITICAL | HIGH | MEDIUM | LOW | Total |
 |---|---|---|---|---|---|
 | code-smells-project | 7 | 5 | 3 | 4 | 19 | 19 de 19, com Impact verificado | [audit-project-1.md](reports/audit-project-1.md) |
-| ecommerce-api-legacy | 4 | 3 | 5 | 3 | 15 |
+| ecommerce-api-legacy | 5 | 6 | 3 | 4 | 18 | 18 de 18, com Impact verificado | [audit-project-2.md](reports/audit-project-2.md) |
 | task-manager-api | 5 | 2 | 6 | 4 | 17 |
 
 ### Projeto 1 — code-smells-project
@@ -191,27 +191,91 @@ Fase 3 — Refatoração
 - [x] Endpoints originais respondem corretamente (com o token certo nas rotas protegidas)
 - [x] Cada Recommendation aplicada como escrita e cada Impact verificado (19/19)
 
-### Projeto 2 — ecommerce-api-legacy (Node.js/Express)
+### Projeto 2 — ecommerce-api-legacy
 
-API de LMS com checkout em 3 arquivos. Praticamente tudo está na classe `AppManager`.
+Resultado da execução com a skill da iteração 3, copiada sem alteração do projeto 1 e rodada em Node.js/Express. O relatório tem 18 findings (5 CRITICAL, 6 HIGH, 3 MEDIUM, 4 LOW) e cobre os 15 problemas da análise manual, todos com `Verification`.
 
-| # | Severidade | Problema | Onde | Por que é relevante |
-|---|---|---|---|---|
-| 1 | CRITICAL | God Class `AppManager` | `AppManager.js:4-139` | Conexão, schema, seed, rotas, checkout, pagamento e relatório na mesma classe; nada pode ser testado ou alterado em isolamento. |
-| 2 | CRITICAL | Credenciais hardcoded | `utils.js:1-7` | Senha do banco e chave `pk_live` do gateway de pagamento versionadas no código. |
-| 3 | CRITICAL | Dados sensíveis no log | `AppManager.js:45` | Confirmado no log do servidor: o número completo do cartão e a chave do gateway são impressos a cada checkout. |
-| 4 | CRITICAL | "Hash" de senha caseiro | `utils.js:17-23`, `AppManager.js:68` (senha padrão `123456`), `AppManager.js:18` (seed em texto puro) | Confirmado: o resultado depende só do início da senha; `senhaforte` e `se` geram o mesmo valor (`c2c2c2c2c2`). |
-| 5 | HIGH | Rotas administrativa e destrutiva sem autenticação | `AppManager.js:80`, `AppManager.js:131` | Qualquer cliente lê o relatório financeiro e apaga usuários. |
-| 6 | HIGH | Estado global mutável | `utils.js:9-15, 25` | O cache global cresce sem limite e nunca é lido; `totalRevenue` é exportado e nunca atualizado. |
-| 7 | HIGH | Acoplamento forte, sem injeção de dependência | `AppManager.js:7`, `app.js:8-10` | O banco é criado dentro do construtor e as rotas dependem de `this.db`; não há como substituir a persistência em um teste. |
-| 8 | MEDIUM | Queries N+1 no relatório financeiro | `AppManager.js:83-126` | Uma query por curso e duas por matrícula, com contadores manuais de callbacks pendentes. Confirmado: a ordem da resposta muda entre execuções. |
-| 9 | MEDIUM | Callback hell | `AppManager.js:37-76` | Cinco callbacks aninhados no checkout; o fluxo e o tratamento de erro ficam difíceis de seguir. |
-| 10 | MEDIUM | Erros de banco ignorados | `AppManager.js:57, 92, 104, 106, 133` | Uma falha de query derruba a requisição ou a deixa sem resposta. Confirmado: apagar um usuário inexistente devolve 200. |
-| 11 | MEDIUM | Checkout sem transação e exclusão sem integridade | `AppManager.js:50-61` (3 inserts independentes), `AppManager.js:12-16` (sem chaves estrangeiras), `AppManager.js:131-137` | Uma falha parcial deixa matrícula sem pagamento. Confirmado: após apagar um usuário, o relatório mostra o aluno como `Unknown`. |
-| 12 | MEDIUM | Validação fraca e respostas inconsistentes | `AppManager.js:35` (só verifica presença), respostas em texto puro (`35, 38, 48, 135`) e em JSON (`60`) | Email e cartão não têm formato validado, e o cliente precisa tratar dois formatos de resposta. |
-| 13 | LOW | Nomes ruins | `AppManager.js:29-33` (`u`, `e`, `p`, `cid`, `cc`) e os campos `usr`, `eml`, `pwd`, `c_id` da API | É preciso ler o fluxo inteiro para saber o que cada variável guarda. |
-| 14 | LOW | Magic strings e numbers | `AppManager.js:46` (`"4"`, `PAID`, `DENIED`), `utils.js:19, 22` (`10000`, `10`), `utils.js:6` (porta) | A regra de aprovação do pagamento e os status ficam em literais espalhados. |
-| 15 | LOW | Código morto e `console.log` como log | `AppManager.js:2` (`totalRevenue` importado sem uso), `utils.js:9` (cache nunca lido), `utils.js:13`, `app.js:13` | Código que parece ter função e não tem; logs sem nível nem destino configurável. |
+**Findings resolvidos:** 18 de 18, cada Recommendation aplicada como escrita e cada Impact verificado.
+
+- **Exclusão de usuário (ponto da revisão):** matrículas e pagamentos são histórico financeiro, então a exclusão de usuário com matrículas responde 409 e nada fica órfão; sem matrículas, apaga como antes.
+- **Autenticação:** o projeto não tem login de usuário, então relatório financeiro e exclusão de usuário exigem `X-Admin-Token` igual a `ADMIN_TOKEN` (401 sem cabeçalho, 403 com token errado ou sem a variável). O checkout continua público, mas, quando o email já existe, confere a senha da conta (401 se não bater), em vez de matricular a conta alheia.
+- **Transação:** curso, usuário, senha e pagamento são conferidos antes de qualquer escrita; usuário novo, matrícula, pagamento e auditoria são gravados numa única transação. Pagamento recusado não cria mais a conta.
+- **Validação:** `usr`, `eml`, `pwd` e `card` precisam ser texto e `c_id` inteiro positivo; `pwd` passou a ser obrigatório, no lugar da senha padrão `123456`.
+
+**Estrutura antes e depois:**
+
+```
+ANTES                         DEPOIS
+src/app.js                    src/app.js            (composition root)
+src/AppManager.js             src/config/           index
+src/utils.js                  src/database/         connection, schema
+                              src/models/           user, course, enrollment, payment, auditLog, report
+                              src/services/         checkout, report, user, paymentGateway
+                              src/controllers/      checkout, report, user, validation
+                              src/routes/           checkout, admin, user
+                              src/middlewares/      asyncHandler, errorHandler, requireAdminToken
+                              src/utils/            errors, logger, password
+                              .env.example
+```
+
+O código passou de 3 arquivos e 180 linhas para 27 módulos e cerca de 560 linhas; a God Class `AppManager` deixou de existir e os callbacks aninhados viraram `async/await`.
+
+**Validação:**
+
+- **Boot:** `npm start` sobe sem nenhuma variável de ambiente, também com `--trace-deprecation` sem avisos.
+- **Smoke test da skill:** 21 requisições; 10 respostas idênticas às originais e 11 mudanças anunciadas.
+- **Linha de base independente com o token** (`ADMIN_TOKEN=tok SMOKE_HEADERS='{"X-Admin-Token":"tok"}' bash baseline/run.sh 2`): 7 de 11 respostas idênticas a [baseline/project-2.txt](baseline/project-2.txt). As 4 diferenças são anunciadas: checkout sem `pwd` responde 400, a exclusão de Leonan (que tem matrícula) responde 409 e, por consequência, os dois relatórios financeiros seguintes não mostram a matrícula sem senha nem o aluno `Unknown`.
+- **Acesso e Verification:** relatório e exclusão sem cabeçalho respondem 401, com token errado ou sem `ADMIN_TOKEN` 403, com o token certo a resposta original; checkout de conta existente com senha errada responde 401; `card` numérico responde 400 em vez de derrubar o processo; exclusão de usuário com matrícula responde 409 e o relatório continua listando o aluno.
+- **Nova varredura:** nenhum segredo literal, nenhum `console.log` fora do logger, nenhum SQL fora de `models/` e `database/`; o log mostra só os 4 últimos dígitos do cartão.
+- **Relatório:** as 52 referências de arquivo e linha existem no código original; contagens e ordem conferem.
+- **Correção além do relatório:** na varredura final, a skill encontrou que JSON malformado devolvia o stack trace com caminhos do servidor (também no legado) e corrigiu no handler central, que agora responde 400 `Bad Request`. Não estava em nenhuma Recommendation; a própria skill registrou isso no resumo final.
+
+Log do boot e dos checkouts após a refatoração:
+
+```
+> node src/app.js
+
+[INFO] Frankenstein LMS rodando na porta 3000...
+[INFO] Processando cartão final 4444
+[INFO] Processando cartão final 0002
+```
+
+O log original imprimia o número completo do cartão e a chave `pk_live` do gateway a cada checkout.
+
+**Mudanças de comportamento**, todas anunciadas nas Recommendations:
+
+- `GET /api/admin/financial-report` e `DELETE /api/users/:id`: 401 sem `X-Admin-Token`, 403 com token errado ou sem `ADMIN_TOKEN`; com o token certo, a resposta original. O relatório passa a ter ordem estável por id.
+- `DELETE /api/users/:id`: 409 para usuário com matrículas; 400 para id não numérico.
+- `POST /api/checkout`: 401 quando o email existe e a senha não confere; 400 sem `pwd` ou com tipos errados; pagamento recusado não cria mais a conta.
+- Senhas, inclusive a do seed, gravadas com scrypt e salt; erros internos com mensagem genérica.
+
+**Checklist de validação:**
+
+Fase 1 — Análise
+- [x] Linguagem detectada corretamente (JavaScript, Node.js)
+- [x] Framework detectado corretamente (Express 4, versão do lockfile)
+- [x] Domínio da aplicação descrito corretamente (API de LMS com checkout de cursos)
+- [x] Número de arquivos analisados condiz com a realidade (3 arquivos, 180 linhas, 3 rotas)
+
+Fase 2 — Auditoria
+- [x] Relatório segue o template definido nos arquivos de referência
+- [x] Cada finding tem arquivo e linhas exatos
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados (18)
+- [x] Detecção de APIs deprecated incluída (`Deprecated APIs: none detected`)
+- [x] Skill pausa e pede confirmação antes da Fase 3
+
+Fase 3 — Refatoração
+- [x] Estrutura de diretórios segue padrão MVC
+- [x] Configuração extraída para módulo de config (sem hardcoded)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado
+- [x] Entry point claro
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente (com o token nas rotas de admin)
+- [x] Cada Recommendation aplicada como escrita e cada Impact verificado (18/18)
 
 ### Projeto 3 — task-manager-api (Python/Flask)
 
@@ -680,7 +744,7 @@ diff baseline/project-1.txt /tmp/depois-1.txt
 
 As únicas diferenças esperadas são nas requisições marcadas com "deve mudar", que cobrem falhas de segurança corrigidas pela refatoração (senhas expostas, SQL injection, rotas administrativas sem autenticação).
 
-No projeto 2, o relatório financeiro e a exclusão de usuário passaram a exigir token. Para compará-los com o original, defina o token da aplicação e o cabeçalho do smoke test:
+Nos projetos refatorados, rotas protegidas exigem credencial. Para compará-las com o original, mande o token: no projeto 2, o `ADMIN_TOKEN`; nos projetos 1 e 3, o token do login de admin, que a linha de base captura sozinha (`SMOKE_HEADERS='{"Authorization":"Bearer ${admin}"}'`):
 
 ```bash
 ADMIN_TOKEN=meu-token SMOKE_HEADERS='{"X-Admin-Token":"meu-token"}' bash baseline/run.sh 2 /tmp/depois-2.txt
