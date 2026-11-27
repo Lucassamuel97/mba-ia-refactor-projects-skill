@@ -78,6 +78,8 @@ Verification: Sem token, `DELETE /readers/2` e `GET /loans` respondem 401; com t
 
 O arquivo recebe o mesmo conteúdo impresso, sem a pergunta de confirmação, dentro de um bloco de código ou como texto Markdown simples, precedido do resumo da Fase 1. Não resuma nem reordene ao salvar.
 
+Se, na Fase 3, a gravação do comportamento original mostrar que o Impact de um finding não acontecia (falso positivo), não apague nem reescreva o finding: acrescente ao fim do arquivo salvo uma seção `## Errata` com o finding, a evidência (a chamada e a resposta gravadas) e o que a Fase 3 fez com a Recommendation. O mesmo vale para uma referência de linha que se revele errada: a errata diz qual era e qual é a correta. O resumo final menciona a errata na seção `Findings`.
+
 ## Resumo final (Fase 3)
 
 ```
