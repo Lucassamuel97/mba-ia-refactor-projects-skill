@@ -9,6 +9,15 @@ Um caso com "unordered": true também tem as listas ordenadas, para respostas cu
 ordem a API não garante.
 A variável de ambiente SMOKE_HEADERS (JSON) acrescenta cabeçalhos a todas as requisições,
 para testar rotas que passaram a exigir token após a refatoração.
+
+Campos opcionais de cada caso:
+  capture  {"variavel": "caminho.do.campo"}: guarda um valor da resposta JSON; "${variavel}"
+           pode ser usado em SMOKE_HEADERS. Campo ausente vira texto vazio, então o login
+           do código legado (que não devolve token) não quebra a execução.
+  silent   executa a chamada sem registrá-la no transcript (ex.: um login para obter token),
+           para que transcripts gravados antes e depois tenham a mesma numeração.
+  drop     chaves removidas do JSON antes de normalizar (ex.: o "token" que o login passou
+           a devolver), para comparar só o que já existia.
 Só usa a biblioteca padrão.
 """
 import json
@@ -37,9 +46,37 @@ def wait_until_up(base_url):
     sys.exit(f"API não respondeu em {base_url} após {BOOT_TIMEOUT_S}s")
 
 
+VARIABLE = re.compile(r"\$\{(\w+)\}")
+VARIABLES = {}
+
+
+def substitute(value):
+    return VARIABLE.sub(lambda m: VARIABLES.get(m.group(1), ""), value)
+
+
+def capture(text, spec):
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = None
+    for name, path in spec.items():
+        value = data
+        for key in path.split("."):
+            value = value.get(key) if isinstance(value, dict) else None
+        VARIABLES[name] = "" if value is None else str(value)
+
+
+def drop_keys(value, keys):
+    if isinstance(value, dict):
+        return {k: drop_keys(v, keys) for k, v in value.items() if k not in keys}
+    if isinstance(value, list):
+        return [drop_keys(v, keys) for v in value]
+    return value
+
+
 def call(base_url, method, path, body):
     data = None
-    headers = dict(EXTRA_HEADERS)
+    headers = {k: substitute(v) for k, v in EXTRA_HEADERS.items()}
     if body is not None:
         data = json.dumps(body).encode()
         headers["Content-Type"] = "application/json"
@@ -60,9 +97,9 @@ def sort_lists(value):
     return value
 
 
-def normalize(text, unordered=False):
+def normalize(text, unordered=False, drop=()):
     try:
-        parsed = json.loads(text)
+        parsed = drop_keys(json.loads(text), set(drop))
         if unordered:
             parsed = sort_lists(parsed)
         text = json.dumps(parsed, indent=2, sort_keys=True, ensure_ascii=False)
@@ -77,15 +114,21 @@ def main():
         cases = json.load(fh)
 
     wait_until_up(base_url)
-    for i, case in enumerate(cases, 1):
+    i = 0
+    for case in cases:
         method, path = case["method"], case["path"]
         status, text = call(base_url, method, path, case.get("body"))
+        if case.get("capture"):
+            capture(text, case["capture"])
+        if case.get("silent"):
+            continue
+        i += 1
         note = f"  # {case['note']}" if case.get("note") else ""
         print(f"### {i:02d} {method} {path}{note}")
         if case.get("body") is not None:
             print("> " + json.dumps(case["body"], ensure_ascii=False))
         print(f"HTTP {status}")
-        print(normalize(text, case.get("unordered", False)))
+        print(normalize(text, case.get("unordered", False), case.get("drop", ())))
         print()
 
 

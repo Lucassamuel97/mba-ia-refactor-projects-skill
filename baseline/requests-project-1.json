@@ -1,7 +1,7 @@
 [
+  {"method": "POST", "path": "/login", "body": {"email": "admin@loja.com", "senha": "admin123"}, "capture": {"admin": "token"}, "silent": true, "note": "login de admin para obter token; não entra no transcript"},
   {"method": "GET", "path": "/"},
   {"method": "GET", "path": "/health", "note": "expõe secret_key; deve mudar após a refatoração"},
-
   {"method": "GET", "path": "/produtos"},
   {"method": "GET", "path": "/produtos/1"},
   {"method": "GET", "path": "/produtos/999", "note": "inexistente"},
@@ -17,16 +17,14 @@
   {"method": "PUT", "path": "/produtos/999", "body": {"nome": "Nada", "preco": 1, "estoque": 1}, "note": "inexistente"},
   {"method": "DELETE", "path": "/produtos/11"},
   {"method": "DELETE", "path": "/produtos/999", "note": "inexistente"},
-
   {"method": "GET", "path": "/usuarios", "note": "expõe senhas em texto puro; deve mudar"},
   {"method": "GET", "path": "/usuarios/1", "note": "expõe senha; deve mudar"},
   {"method": "GET", "path": "/usuarios/999", "note": "inexistente"},
   {"method": "POST", "path": "/usuarios", "body": {"nome": "Ana Lima", "email": "ana@email.com", "senha": "segredo1"}},
   {"method": "POST", "path": "/usuarios", "body": {"nome": "Sem email"}, "note": "campos obrigatórios faltando"},
-  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "senha": "123456"}},
-  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "senha": "errada"}, "note": "senha errada"},
-  {"method": "POST", "path": "/login", "body": {"email": "admin@loja.com' --", "senha": "x"}, "note": "SQL injection: hoje autentica como admin; deve virar 401"},
-
+  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "senha": "123456"}, "drop": ["token"]},
+  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "senha": "errada"}, "note": "senha errada", "drop": ["token"]},
+  {"method": "POST", "path": "/login", "body": {"email": "admin@loja.com' --", "senha": "x"}, "note": "SQL injection: hoje autentica como admin; deve virar 401", "drop": ["token"]},
   {"method": "POST", "path": "/pedidos", "body": {"usuario_id": 2, "itens": [{"produto_id": 2, "quantidade": 2}, {"produto_id": 10, "quantidade": 1}]}},
   {"method": "POST", "path": "/pedidos", "body": {"usuario_id": 2, "itens": [{"produto_id": 6, "quantidade": 999}]}, "note": "estoque insuficiente"},
   {"method": "POST", "path": "/pedidos", "body": {"usuario_id": 2, "itens": [{"produto_id": 999, "quantidade": 1}]}, "note": "produto inexistente"},
@@ -38,7 +36,6 @@
   {"method": "PUT", "path": "/pedidos/1/status", "body": {"status": "aprovado"}},
   {"method": "PUT", "path": "/pedidos/1/status", "body": {"status": "voando"}, "note": "status inválido"},
   {"method": "GET", "path": "/relatorios/vendas"},
-
   {"method": "POST", "path": "/admin/query", "body": {"sql": "SELECT COUNT(*) AS total FROM produtos"}, "note": "SQL arbitrário sem autenticação; deve mudar"},
   {"method": "POST", "path": "/admin/query", "body": {}, "note": "sem sql"},
   {"method": "POST", "path": "/admin/reset-db", "note": "apaga tudo sem autenticação; deve mudar"},

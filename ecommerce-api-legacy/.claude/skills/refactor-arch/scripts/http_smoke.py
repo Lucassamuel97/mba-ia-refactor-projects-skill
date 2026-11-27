@@ -20,6 +20,10 @@ Formato do arquivo de requisições (lista JSON):
   unordered      ordena as listas da resposta, para APIs que não garantem ordem
   ignore         nomes de campos cujo valor muda a cada execução (tokens, ids aleatórios)
   expect_change  motivo pelo qual a resposta DEVE mudar após a refatoração
+  capture        {"variavel": "caminho.do.campo"}: guarda um valor da resposta JSON
+                 (ex.: {"admin": "dados.token"}); "${variavel}" usa o valor em path,
+                 headers ou body das chamadas seguintes. Campo ausente vira texto vazio,
+                 então o mesmo arquivo serve antes (login sem token) e depois.
 
 As respostas são normalizadas (chaves JSON ordenadas, timestamps trocados por <TS>)
 para que duas execuções com o mesmo estado inicial sejam comparáveis.
@@ -68,6 +72,31 @@ def call(base_url, case):
         return 0, f"ERRO DE CONEXAO: {err}"
 
 
+VARIABLE = re.compile(r"\$\{(\w+)\}")
+
+
+def substitute(value, variables):
+    if isinstance(value, str):
+        return VARIABLE.sub(lambda m: variables.get(m.group(1), ""), value)
+    if isinstance(value, dict):
+        return {k: substitute(v, variables) for k, v in value.items()}
+    if isinstance(value, list):
+        return [substitute(v, variables) for v in value]
+    return value
+
+
+def capture(text, spec, variables):
+    try:
+        data = json.loads(text)
+    except ValueError:
+        data = None
+    for name, path in spec.items():
+        value = data
+        for key in path.split("."):
+            value = value.get(key) if isinstance(value, dict) else None
+        variables[name] = "" if value is None else str(value)
+
+
 def scrub(value, unordered, ignore):
     if isinstance(value, dict):
         return {k: "<IGNORED>" if k in ignore else scrub(v, unordered, ignore)
@@ -100,8 +129,15 @@ def cmd_run(args):
         sys.exit(f"A aplicacao nao respondeu em {base_url} apos {args.wait}s")
 
     results = []
+    variables = {}
     for index, case in enumerate(cases, 1):
-        status, text = call(base_url, case)
+        resolved = dict(case)
+        for key in ("path", "headers", "body"):
+            if key in case:
+                resolved[key] = substitute(case[key], variables)
+        status, text = call(base_url, resolved)
+        if case.get("capture"):
+            capture(text, case["capture"], variables)
         results.append({
             "id": f"{index:02d} {case['method'].upper()} {case['path']}",
             "status": status,

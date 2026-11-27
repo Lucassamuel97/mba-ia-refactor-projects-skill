@@ -1,7 +1,7 @@
 [
+  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "password": "1234"}, "capture": {"admin": "token"}, "silent": true, "note": "login de admin para obter token; não entra no transcript"},
   {"method": "GET", "path": "/"},
   {"method": "GET", "path": "/health"},
-
   {"method": "GET", "path": "/tasks"},
   {"method": "GET", "path": "/tasks/1"},
   {"method": "GET", "path": "/tasks/999", "note": "inexistente"},
@@ -18,7 +18,6 @@
   {"method": "PUT", "path": "/tasks/999", "body": {"status": "done"}, "note": "inexistente"},
   {"method": "DELETE", "path": "/tasks/11"},
   {"method": "DELETE", "path": "/tasks/999", "note": "inexistente"},
-
   {"method": "GET", "path": "/users"},
   {"method": "GET", "path": "/users/1", "note": "expõe hash MD5 da senha; deve mudar"},
   {"method": "GET", "path": "/users/999", "note": "inexistente"},
@@ -28,15 +27,13 @@
   {"method": "POST", "path": "/users", "body": {"name": "Email ruim", "email": "sem-arroba", "password": "segredo1"}, "note": "email inválido"},
   {"method": "POST", "path": "/users", "body": {"name": "Senha curta", "email": "curta@email.com", "password": "123"}, "note": "senha curta"},
   {"method": "PUT", "path": "/users/4", "body": {"name": "Ana L. Souza", "role": "manager"}, "note": "expõe hash da senha; deve mudar"},
-  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "password": "1234"}, "note": "token falso e hash exposto; deve mudar"},
-  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "password": "errada"}, "note": "senha errada"},
+  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "password": "1234"}, "note": "token falso e hash exposto; deve mudar", "drop": ["token"]},
+  {"method": "POST", "path": "/login", "body": {"email": "joao@email.com", "password": "errada"}, "note": "senha errada", "drop": ["token"]},
   {"method": "DELETE", "path": "/users/4"},
   {"method": "DELETE", "path": "/users/999", "note": "inexistente"},
-
   {"method": "GET", "path": "/reports/summary"},
   {"method": "GET", "path": "/reports/user/1"},
   {"method": "GET", "path": "/reports/user/999", "note": "inexistente"},
-
   {"method": "GET", "path": "/categories"},
   {"method": "POST", "path": "/categories", "body": {"name": "Docs", "description": "Documentação", "color": "#9b59b6"}},
   {"method": "POST", "path": "/categories", "body": {"description": "sem nome"}, "note": "nome obrigatório"},

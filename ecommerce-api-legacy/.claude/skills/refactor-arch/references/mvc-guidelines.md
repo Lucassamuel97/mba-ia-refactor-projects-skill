@@ -117,22 +117,27 @@ A refatoração muda a organização interna, não a API. Clientes existentes de
 
 Preserve:
 
-- Caminho e método de todas as rotas do inventário da Fase 1.
+- Caminho e método de todas as rotas do inventário da Fase 1, exceto as que uma Recommendation manda remover.
 - Status codes e formato do corpo das respostas de sucesso e de erro de validação (mesmas chaves, mesmo envelope, mesmas mensagens).
 - Nomes dos campos de entrada, mesmo que sejam ruins. Nomes internos podem melhorar; o contrato não.
 - A ordem de registro das rotas quando o framework resolve por ordem (rota fixa antes de rota com parâmetro).
 - O comando de start e a porta padrão.
 - Os dados de seed e o schema, para que o estado inicial seja o mesmo.
 
-Podem mudar, e toda mudança entra em `Behavior Changes` no resumo final:
+Podem mudar, sempre porque uma Recommendation aprovada o descreve, e toda mudança entra em `Behavior Changes` no resumo final:
 
 - Campos sensíveis deixam de aparecer nas respostas.
 - Tentativas de injeção deixam de funcionar.
-- Operações perigosas passam a exigir proteção.
+- Rotas que executam SQL, comando ou código recebido na requisição deixam de existir e passam a responder 404.
+- Operações destrutivas legítimas passam a exigir credencial de administrador.
+- Rotas citadas em findings de autenticação, exposição ou privilégio passam a exigir credencial: 401 sem token, 403 sem papel suficiente, a resposta original com o token certo (T-17).
+- O login passa a devolver um token assinado num campo novo; os campos existentes da resposta continuam.
+- Papel ou privilégio enviado por quem não é admin deixa de ter efeito.
+- A exclusão de um registro com dependentes deixa de produzir órfãos (filhos apagados, referência anulada ou 409, conforme o playbook).
 - Erros internos passam a devolver mensagem genérica, sem detalhes da exceção.
-- Entradas inválidas que causavam erro 500 passam a devolver 400.
+- Entradas inválidas passam a ser recusadas com 400, tanto as que causavam erro 500 quanto as que eram aceitas e gravadas.
 
-Qualquer outra diferença de comportamento é um defeito da refatoração.
+Qualquer diferença que nenhuma Recommendation aprovada descreve é um defeito da refatoração. O contrário também vale: preservar o contrato não justifica deixar de aplicar parte de uma Recommendation.
 
 ## 6. Adaptação ao ponto de partida
 

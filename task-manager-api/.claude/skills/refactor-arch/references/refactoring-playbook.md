@@ -13,23 +13,26 @@ Como transformar cada anti-pattern do catálogo em código correto, com exemplos
   - [T-03 Dividir a God Class em camadas](#t-03--dividir-a-god-class-em-camadas)
   - [T-04 Parar de expor dados sensíveis](#t-04--parar-de-expor-dados-sensíveis)
   - [T-05 Hash de senha com KDF padrão](#t-05--hash-de-senha-com-kdf-padrão)
-  - [T-06 Proteger operações perigosas](#t-06--proteger-operações-perigosas)
+  - [T-06 Remover ou proteger operações perigosas](#t-06--remover-ou-proteger-operações-perigosas)
   - [T-07 Afinar o controller](#t-07--afinar-o-controller)
   - [T-08 Trocar estado global por dependência injetada](#t-08--trocar-estado-global-por-dependência-injetada)
   - [T-09 Eliminar N+1](#t-09--eliminar-n1)
-  - [T-10 Agrupar escritas em transação](#t-10--agrupar-escritas-em-transação)
+  - [T-10 Agrupar escritas em transação e tratar dependentes](#t-10--agrupar-escritas-em-transação-e-tratar-dependentes)
   - [T-11 Centralizar a validação de entrada](#t-11--centralizar-a-validação-de-entrada)
   - [T-12 Centralizar o tratamento de erro](#t-12--centralizar-o-tratamento-de-erro)
   - [T-13 Remover duplicação](#t-13--remover-duplicação)
   - [T-14 Substituir APIs deprecated](#t-14--substituir-apis-deprecated)
   - [T-15 Converter callbacks em async/await](#t-15--converter-callbacks-em-asyncawait)
   - [T-16 Limpeza de legibilidade](#t-16--limpeza-de-legibilidade)
-- [O que não aplicar automaticamente](#o-que-não-aplicar-automaticamente)
+  - [T-17 Autenticação e autorização por padrão](#t-17--autenticação-e-autorização-por-padrão)
+- [Limites da refatoração](#limites-da-refatoração)
 
 ## Regras gerais
 
+- **A Recommendation aprovada é o escopo da Fase 3, por inteiro.** Cada finding do relatório traz uma Recommendation escrita a partir de uma transformação deste playbook, e a pessoa a aprovou ao confirmar. Aplique-a como escrita: todas as ações e todas as ocorrências listadas em `File:`. Não troque por uma versão mais branda (proteger em vez de remover, registrar em vez de corrigir, proteger só parte das rotas), não deixe parte para depois e não acrescente o que ela não pede.
+- **Feche o Impact, não só o sinal.** O finding só está resolvido quando a consequência descrita no `Impact` deixa de acontecer. Mover um `print("Devolver estoque")` para um service não devolve o estoque; proteger as rotas administrativas não impede que qualquer um liste os pedidos. Antes de dar uma transformação por concluída, reproduza o Impact e confirme que ele não acontece mais. Na Fase 2, isso vale ao contrário: só recomende o que este playbook manda fazer, porque a Recommendation será cobrada. Se uma Recommendation se mostrar inviável como escrita, pare e pergunte, com a alternativa.
 - **A aplicação precisa subir como antes.** O mesmo comando de start, sem nenhuma variável de ambiente nova obrigatória. Quem clonar o projeto e seguir o README antigo tem de ver a aplicação no ar. Segredos saem do código, mas a ausência deles no ambiente de desenvolvimento não pode impedir o boot (veja T-02).
-- **O contrato HTTP não muda**, salvo as exceções de segurança listadas nas guidelines de MVC. Mensagens de erro, nomes de campos e status codes existentes são copiados como estão.
+- **O contrato HTTP não muda**, exceto nas mudanças que a Recommendation aprovada descreve (os tipos permitidos estão nas guidelines de MVC). Fora delas, mensagens de erro, nomes de campos e status codes existentes são copiados como estão. Preservar o contrato nunca justifica aplicar só parte de uma Recommendation: a mudança que ela causa vai para `Behavior Changes`.
 - **Passos pequenos, verificados.** Depois de cada camada extraída, confirme que o código ainda carrega (`python -c "import app"`, `node --check arquivo.js` ou o equivalente). Um erro de import descoberto no fim custa muito mais para localizar.
 - **Sem dependências novas** quando a biblioteca padrão ou o que o projeto já usa resolve. Cada dependência adicionada é um risco de o projeto não instalar na máquina de outra pessoa.
 - **Mova, não reescreva.** Leve o código existente para a camada certa mudando o mínimo. Reescrever regra de negócio durante a mudança de lugar é a principal fonte de regressão.
@@ -65,18 +68,21 @@ A partir do inventário de rotas da Fase 1, escreva um JSON com pelo menos uma c
   {"method": "GET", "path": "/books"},
   {"method": "GET", "path": "/books/999"},
   {"method": "POST", "path": "/books", "body": {"title": "Dom Casmurro", "copies": 2}},
-  {"method": "POST", "path": "/login", "body": {"email": "ana@example.com", "password": "secret"},
-   "ignore": ["token"]},
-  {"method": "GET", "path": "/reports/loans", "unordered": true}
+  {"method": "POST", "path": "/login", "body": {"email": "admin@example.com", "password": "secret"},
+   "capture": {"admin": "token"}, "ignore": ["token"]},
+  {"method": "GET", "path": "/reports/loans", "headers": {"Authorization": "Bearer ${admin}"},
+   "unordered": true}
 ]
 ```
+
+`capture` guarda o valor de um campo da resposta (caminho com pontos, como `data.token`) numa variável, e `${nome}` usa essa variável em `path`, `headers` ou `body`. Na gravação do comportamento original, o login ainda não devolve token: a variável fica vazia e o cabeçalho vai como `Bearer `, que o código legado ignora. Assim, o mesmo arquivo serve para antes e depois, e as rotas protegidas chamadas com o token certo precisam devolver exatamente a resposta original.
 
 Cuidados:
 
 - Ordene para que cada chamada encontre o estado de que precisa: criar, ler, atualizar, apagar.
 - Deixe por último as chamadas destrutivas globais (reset de dados).
 - Use `"unordered": true` em respostas cuja ordem a API não garante, e `"ignore"` em campos que mudam a cada execução.
-- Inclua uma chamada que demonstre cada falha de segurança encontrada (por exemplo, o login com injeção). Ela comprova a correção depois.
+- Inclua uma chamada que demonstre cada falha de segurança encontrada (por exemplo, o login com injeção) e uma que exercite cada mudança anunciada nas Recommendations (a exclusão de um registro com dependentes, uma entrada que passará a ser recusada, a rota que será removida). Elas comprovam a correção depois.
 - Use os exemplos do projeto (`*.http`, README, coleções) para acertar os payloads.
 
 ### 2. Grave o comportamento original
@@ -104,9 +110,9 @@ Se a aplicação não sobe antes da refatoração, registre o erro, corrija só 
 
 ### 3. Marque as mudanças esperadas
 
-Para cada chamada cuja resposta deve mudar por causa de uma correção de segurança, acrescente `"expect_change": "<motivo>"` no arquivo de requisições. Faça isso antes de rodar o depois: declarar a expectativa antes de ver o resultado impede que uma regressão seja racionalizada como "esperada".
+Para cada chamada cuja resposta deve mudar por causa de uma Recommendation aprovada (campo removido, rota removida, guard novo, validação nova, exclusão com dependentes), acrescente `"expect_change": "<Recommendation que causa a mudança>"` no arquivo de requisições. Faça isso antes de rodar o depois: declarar a expectativa antes de ver o resultado impede que uma regressão seja racionalizada como "esperada", e o compare acusa as chamadas que deveriam ter mudado e não mudaram, o que denuncia uma Recommendation esquecida.
 
-Se uma rota passou a exigir um cabeçalho (guard de acesso), mantenha a chamada original sem o cabeçalho, marcada com `expect_change`, para registrar o novo comportamento.
+Se uma rota passou a exigir um cabeçalho (guard de acesso), mantenha a chamada original sem o cabeçalho, marcada com `expect_change`, para registrar o novo comportamento. Mantenha também as chamadas a rotas removidas, marcadas com `expect_change`: o 404 no depois comprova a remoção.
 
 ### 4. Grave o comportamento novo e compare
 
@@ -454,14 +460,52 @@ Notas:
 - **Seed:** as senhas do seed passam pela mesma função de hash, para que os logins de exemplo continuem funcionando.
 - **Dados já gravados** com o esquema antigo: se o banco é recriado a cada boot ou pelo seed, basta o item anterior. Se há dados persistentes, aceite o formato antigo na verificação e regrave com o novo hash no primeiro login bem-sucedido.
 - Confira o tamanho da coluna: hashes modernos têm mais de 100 caracteres.
-- Remova senha padrão atribuída quando o usuário não informa uma, se isso não mudar o contrato; se mudar, registre como finding adiado.
+- **Senha padrão** atribuída quando o usuário não informa uma: a Recommendation escolhe entre exigir a senha (a requisição sem ela passa a receber 400) e criar a conta sem senha utilizável (a resposta não muda), e a Fase 3 faz exatamente o escolhido.
 - Sem Werkzeug, o Python oferece `hashlib.scrypt` com `secrets.token_bytes` para o salt e `hmac.compare_digest` para comparar.
 
-## T-06 — Proteger operações perigosas
+## T-06 — Remover ou proteger operações perigosas
 
 **Resolve:** AP-06, parte de AP-11
 
-A rota continua existindo, para não quebrar o contrato, mas fica desligada por padrão e só responde a quem apresenta um token definido no ambiente.
+Uma operação perigosa tem um de dois destinos, e a Recommendation diz qual:
+
+| Operação | Correção |
+|---|---|
+| Executa SQL, comando de shell ou código recebido na requisição | **Remover.** Não existe versão segura: um token só muda quem pode tomar o banco ou o servidor, e qualquer vazamento dele devolve o controle total. A rota, o handler e o código que só ela usava deixam de existir. |
+| Operação destrutiva ou administrativa legítima (reset de dados, exclusão em massa, relatório interno) | **Proteger.** A rota continua existindo, desligada por padrão, e só responde a quem apresenta um token definido no ambiente. |
+
+### Remover
+
+Antes (Python):
+
+```python
+@app.route("/admin/sql", methods=["POST"])
+def run_sql():
+    sql = request.get_json().get("sql", "")
+    rows = db.execute(sql).fetchall()
+    db.commit()
+    return jsonify({"rows": [dict(row) for row in rows]}), 200
+```
+
+Depois: a rota não é registrada e nenhum código do projeto executa SQL recebido de fora.
+
+```python
+# routes/admin_routes.py: só as operações que têm versão segura
+admin_bp.add_url_rule("/admin/purge", view_func=require_admin_token(admin_controller.purge_data),
+                      methods=["POST"])
+# POST /admin/sql deixa de existir e responde 404, como qualquer rota desconhecida.
+```
+
+Em Express é igual: o `router.post('/admin/sql', ...)`, o handler e a função que executa o texto recebido são apagados.
+
+Notas:
+
+- Apague também o que só servia à rota: método de controller, função de model que executa texto arbitrário, exceções e mensagens exclusivas dela. Procure cada nome no projeto inteiro antes de apagar.
+- Não troque a remoção por um guard, por um 403 fixo ou por um 410 "para manter o contrato". Isso é a rota protegida com outro nome, e a Recommendation disse remover.
+- A Recommendation anuncia a mudança ("a rota deixa de existir e passa a responder 404"), e a chamada à rota fica no smoke test com `expect_change`: o 404 no depois comprova a remoção.
+- Se a rota tinha um uso legítimo identificável (consultar contagens, por exemplo), esse uso só vira uma rota própria, com query fixa, se a Recommendation disser isso.
+
+### Proteger
 
 Antes (Python):
 
@@ -503,9 +547,10 @@ admin_bp.add_url_rule("/admin/purge", view_func=require_admin_token(admin_contro
 
 Notas:
 
-- Sem `ADMIN_TOKEN` no ambiente, a rota responde 403 sempre. Seguro por padrão, e a rota "continua respondendo".
+- Quando o projeto tem login de usuário, a proteção usa o papel de administrador do T-17, e não um token separado. `ADMIN_TOKEN` é para projetos sem login.
+- Sem `ADMIN_TOKEN` no ambiente, a rota responde 403 sempre. Seguro por padrão, e a rota continua respondendo.
 - Use a mesma chave de erro do restante da API no corpo do 403.
-- Execução de SQL ou de código recebido na requisição não tem versão segura. Proteja com o guard e recomende a remoção no resumo final.
+- Este caminho vale só para operações que têm versão segura. Execução de SQL, comando ou código recebido na requisição segue o caminho "Remover", mesmo que a rota também esteja atrás de um prefixo `admin`.
 - Modo debug: vem da config, desligado por padrão (T-02).
 - No Express, o mesmo guard é um middleware `(req, res, next)` aplicado só nas rotas administrativas.
 - No smoke test, a chamada sem token fica com `expect_change`.
@@ -684,6 +729,7 @@ class BoundedCache {
 Notas:
 
 - **Banco em memória** (`:memory:`): cada conexão nova é um banco vazio, então é preciso uma conexão única. Ela é criada no entry point e injetada nos models, não guardada em variável global de módulo.
+- **Estado em memória dentro de objetos.** Uma coleção em atributo de um objeto que vive o processo todo (`self.notifications = []`) é estado global com outro nome. Se nada lê esse estado, ele é apagado junto com as escritas; se uma rota ou regra lê, ele passa para uma tabela. Injetar o objeto não resolve: a coleção continua crescendo.
 - Com ORM que gerencia sessão por requisição, não crie outro mecanismo; use o do ORM.
 - Criação de schema e seed saem da função que abre a conexão e passam a ser chamados uma vez, na inicialização.
 
@@ -771,7 +817,7 @@ Notas:
 - Use `LEFT JOIN` quando o original tolerava o registro relacionado ausente; `INNER JOIN` faria linhas sumirem.
 - Contagens e somas feitas em laço na aplicação viram `COUNT`/`SUM` com `GROUP BY`.
 
-## T-10 — Agrupar escritas em transação
+## T-10 — Agrupar escritas em transação e tratar dependentes
 
 **Resolve:** AP-13
 
@@ -826,8 +872,53 @@ async function inTransaction(db, work) {
 Notas:
 
 - Com ORM: um único `commit` no fim do caso de uso e `rollback` no tratamento de erro.
-- Exclusão de registro pai: se o comportamento original deixava filhos órfãos e a resposta é a mesma, apagar os filhos na mesma transação é uma correção segura. Se mudar o que outras rotas devolvem, registre em `Behavior Changes`.
 - Pagamentos e outras chamadas externas não participam da transação do banco: faça a chamada externa, depois grave o resultado na transação.
+
+### Exclusão de registro com dependentes
+
+Apagar um registro pai sem tratar os filhos deixa órfãos, mesmo dentro de uma transação. A Recommendation escolhe um destes tratamentos pelo papel que os filhos têm, e a Fase 3 implementa exatamente o escolhido:
+
+| Os registros filhos... | Tratamento | Resposta da exclusão |
+|---|---|---|
+| só existem em função do pai (itens de um carrinho, sessões, preferências) | apagar os filhos e o pai na mesma transação | a de sucesso de antes |
+| têm valor próprio e a referência ao pai é opcional (livro com categoria) | anular a referência e apagar o pai na mesma transação | a de sucesso de antes |
+| são histórico ou registro financeiro que outras rotas leem (pedidos, pagamentos, matrículas, empréstimos) | recusar a exclusão enquanto houver filhos; sem filhos, apagar como antes | 409 no envelope de erro da API, enquanto houver filhos |
+
+Histórico não é apagado em cascata porque um pagamento de um cliente removido continua sendo receita que aconteceu: apagá-lo altera relatórios passados sem ninguém perceber.
+
+Antes (Python):
+
+```python
+def delete_reader(reader_id):
+    db.execute("DELETE FROM readers WHERE id = ?", (reader_id,))
+    db.commit()  # empréstimos e multas do leitor ficam apontando para um id que não existe
+```
+
+Depois, com empréstimos que o relatório de circulação lê:
+
+```python
+def delete_reader(reader_id):
+    with db:
+        if loan_model.count_by_reader(reader_id) > 0:
+            raise ConflictError("Leitor possui empréstimos registrados")  # vira 409 no handler central
+        reader_model.delete(reader_id)
+```
+
+Depois, com uma referência opcional:
+
+```python
+def delete_category(category_id):
+    with db:
+        db.execute("UPDATE books SET category_id = NULL WHERE category_id = ?", (category_id,))
+        db.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+```
+
+Notas da exclusão:
+
+- A Recommendation diz qual linha da tabela se aplica e a resposta que resulta dela ("a exclusão responde 409 enquanto o usuário tiver matrículas"). "Decidir a regra depois" não é uma Recommendation.
+- A checagem e a exclusão ficam na mesma transação, para que um filho criado entre as duas não escape.
+- O 409 vem de uma exceção de domínio com esse status, convertida pelo handler central (T-12), com a chave e o formato de erro que a API já usa.
+- A resposta nova entra em `Behavior Changes`, e o smoke test exclui um registro que tem dependentes, com `expect_change`.
 
 ## T-11 — Centralizar a validação de entrada
 
@@ -876,8 +967,8 @@ def create_book():
 
 Notas:
 
-- **Mensagens e status já existentes ficam como estão.** A validação nova só cobre o que antes passava sem checagem: tipo errado que virava 500, número negativo aceito, corpo `null`.
-- Entrada inválida que antes era aceita e agora é recusada muda o comportamento: marque no smoke test e liste em `Behavior Changes`.
+- **Mensagens e status já existentes ficam como estão.** As checagens que já existiam mantêm o texto e o status.
+- **A Recommendation define o alcance.** Tudo o que ela lista é validado, inclusive o que hoje é aceito e passa a ser recusado: tipo errado que virava 500, número negativo gravado, corpo `null`, campo que era opcional e passa a ser obrigatório, id de rota que não é inteiro positivo. Cada recusa nova vai para `Behavior Changes` e para o smoke test com `expect_change`.
 - Em Python, `bool` é subclasse de `int`; exclua-o ao validar números.
 - Valide referências a outros registros (o usuário existe? a categoria existe?) no service, antes da escrita.
 - Se o projeto já tem uma biblioteca de validação entre as dependências, use-a; não adicione uma.
@@ -929,6 +1020,18 @@ class BusinessRuleError(AppError):
 
 class NotFoundError(AppError):
     status_code = 404
+
+
+class UnauthorizedError(AppError):
+    status_code = 401
+
+
+class ForbiddenError(AppError):
+    status_code = 403
+
+
+class ConflictError(AppError):
+    status_code = 409
 ```
 
 ```python
@@ -1023,7 +1126,7 @@ def find_by_id(book_id):
 
 Notas:
 
-- Confira se as cópias são mesmo iguais. Quando divergem (a criação valida um campo que a atualização não valida), preserve o comportamento de cada uma com um parâmetro; unificar pelo mais rígido muda o contrato.
+- Confira se as cópias são mesmo iguais. Quando divergem porque uma perdeu uma checagem que a outra tem (a atualização não valida o que a criação valida), a divergência é um defeito: unifique pela regra mais rígida e declare a mudança. A Recommendation diz isso explicitamente, e a Fase 3 aplica a regra unificada nos dois caminhos.
 - Duas funções que diferem por um filtro viram uma função com parâmetro opcional.
 - Listas de valores válidos e expressões regulares repetidas viram uma constante única (T-16).
 
@@ -1201,21 +1304,220 @@ Notas:
 - **Constantes:** valores de regra (faixas, limites, listas de status e papéis) ganham nome e ficam junto do model ou em um módulo de constantes. Se o projeto já tem constantes definidas e não usadas, use-as.
 - **Nomes:** renomeie variáveis e funções internas. Campos do contrato da API (corpo, query string, resposta) e colunas do banco ficam como estão.
 - **Log:** use o logger da linguagem ou do framework (`logging`, `app.logger`); em Node sem biblioteca de log, concentre a saída em um módulo `logger` pequeno em vez de adicionar dependência. Nada de dado sensível no log (T-04).
-- **Código morto:** remova imports, funções, variáveis e dependências sem uso. Antes de apagar uma função, procure o nome no projeto inteiro, incluindo seeds e testes.
+- **Código morto:** remova imports, funções, variáveis e dependências sem uso. Antes de apagar uma função, procure o nome no projeto inteiro, incluindo seeds e testes. Isso inclui serviços e helpers sem chamador cujo uso seria funcionalidade nova (enviar um email que hoje não é enviado): eles são removidos, e a Recommendation diz "remover". A exceção é o helper que implementa exatamente uma regra hoje duplicada em outro lugar; esse passa a ser usado (T-07, T-13).
 - **Verbosidade:** `if x: return True else: return False` vira `return x`; `type(v) == list` vira `isinstance(v, list)`.
 - Esta transformação vem por último, depois que a estrutura está validada. Assim, uma regressão no smoke test aponta para a mudança estrutural e não para um rename.
 
 ---
 
-## O que não aplicar automaticamente
+## T-17 — Autenticação e autorização por padrão
 
-Algumas correções são reais, mas mudam o contrato da API ou exigem decisão de quem cuida do produto. Registre o finding, explique em `Deferred` e não aplique sem pedido explícito do usuário:
+**Resolve:** AP-11, a escalação de privilégio e a parte de AP-04 e AP-06 que vem de rotas sem identidade
 
-- **Autenticação obrigatória nas rotas de negócio.** Passar a exigir token em todas as rotas quebra todos os clientes atuais. Proteja só as operações destrutivas e administrativas (T-06).
-- **Mudança de formato de resposta** para padronizar (texto puro para JSON, novo envelope). Clientes analisam o formato atual.
+Autenticação ausente é corrigida nesta refatoração, mesmo mudando o contrato. Um Impact como "qualquer cliente lista os pedidos de todos" só deixa de acontecer quando a rota exige credencial; proteger só as rotas administrativas, ou deixar o guard pronto e desligado, deixa o Impact acontecendo. A correção tem quatro partes.
+
+### 1. Uma política para cada rota
+
+Monte uma tabela com todas as rotas do inventário da Fase 1 e a política de cada uma. Nenhuma rota fica sem política, e toda rota citada num finding de autenticação, exposição ou privilégio recebe a política que elimina o Impact descrito. Na dúvida entre duas, use a mais restrita.
+
+| Política | Quem acessa | Rotas típicas |
+|---|---|---|
+| pública | qualquer cliente | login, cadastro público, health, índice, leitura de catálogo que não expõe dados de pessoas nem valores financeiros |
+| dono ou admin | o usuário dono do recurso, identificado pelo token, ou um administrador | perfil, pedidos, tarefas, matrículas de um usuário |
+| admin | só administradores | criar, alterar e apagar catálogo, usuários e papéis; listagens de todos os usuários ou pedidos; relatórios gerenciais e financeiros; operações administrativas |
+
+A tabela entra na Recommendation do finding de autenticação e em `Behavior Changes`.
+
+### 2. Credencial assinada no login
+
+O login passa a devolver um token assinado com a `SECRET_KEY` e com validade, num campo novo da resposta (`token`). Os campos que a resposta já tinha continuam iguais. Token fixo ou previsível (`"fake-token-" + id`) é substituído pelo assinado. Não precisa de dependência nova: o Flask já instala o `itsdangerous`, e o Node tem `node:crypto`.
+
+Quando o projeto não tem login de usuário (nenhuma rota emite credencial), as rotas de admin usam `ADMIN_TOKEN` do ambiente (T-06) e as rotas de cliente seguem as regras de negócio do domínio (por exemplo, conferir a senha da conta existente antes de usá-la).
+
+### 3. Um guard só, que nega por padrão
+
+Um middleware lê `Authorization: Bearer <token>`, valida assinatura e validade e carrega o usuário do banco. O papel vem do banco a cada requisição, nunca do token, para que rebaixar alguém tenha efeito imediato. Sem credencial válida, 401; com papel insuficiente, 403; os dois no envelope de erro da API. O dono de um recurso vem do token: um `usuario_id` enviado no corpo ou na URL precisa ser o do token, a menos que quem pede seja admin.
+
+### 4. Privilégio só pelo servidor
+
+O cadastro público grava sempre o papel padrão, ignorando o papel enviado. Só um admin autenticado define ou altera papéis; quem não é admin e tenta alterar o próprio papel recebe 403.
+
+Antes (Python):
+
+```python
+@readers_bp.route("/login", methods=["POST"])
+def login():
+    reader = reader_model.find_by_credentials(request.json["email"], request.json["password"])
+    if reader is None:
+        return jsonify({"error": "Credenciais inválidas"}), 401
+    return jsonify({"data": reader, "token": "token-" + str(reader["id"])}), 200
+
+
+@loans_bp.route("/loans", methods=["GET"])
+def list_loans():                      # qualquer cliente lê os empréstimos de todos
+    return jsonify(loan_model.find_all()), 200
+
+
+@readers_bp.route("/readers", methods=["POST"])
+def create_reader():                   # qualquer cliente se cadastra como admin
+    return jsonify(reader_service.create(**request.json)), 201
+```
+
+Depois:
+
+```python
+# middlewares/auth.py
+from functools import wraps
+
+from flask import current_app, g, request
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+
+from middlewares.errors import ForbiddenError, UnauthorizedError
+from models import reader_model
+
+TOKEN_MAX_AGE_SECONDS = 8 * 60 * 60
+ADMIN_ROLE = "admin"
+
+
+def _serializer():
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="auth-token")
+
+
+def issue_token(reader_id):
+    return _serializer().dumps({"uid": reader_id})
+
+
+def _authenticated_reader():
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    if scheme != "Bearer" or not token:
+        return None
+    try:
+        claims = _serializer().loads(token, max_age=TOKEN_MAX_AGE_SECONDS)
+    except (BadSignature, SignatureExpired):
+        return None
+    return reader_model.find_by_id(claims["uid"])  # papel lido do banco
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        reader = _authenticated_reader()
+        if reader is None:
+            raise UnauthorizedError("Autenticação necessária")
+        g.current_reader = reader
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def admin_required(view):
+    @login_required
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if g.current_reader["role"] != ADMIN_ROLE:
+            raise ForbiddenError("Acesso negado")
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def ensure_owner_or_admin(owner_id):
+    reader = g.current_reader
+    if reader["role"] != ADMIN_ROLE and reader["id"] != owner_id:
+        raise ForbiddenError("Acesso negado")
+```
+
+```python
+# routes: a política de cada rota fica visível no registro
+readers_bp.add_url_rule("/login", view_func=reader_controller.login, methods=["POST"])            # pública
+readers_bp.add_url_rule("/readers", view_func=reader_controller.create, methods=["POST"])         # pública
+loans_bp.add_url_rule("/loans", view_func=admin_required(loan_controller.list_all), methods=["GET"])
+loans_bp.add_url_rule("/readers/<int:reader_id>/loans",
+                      view_func=login_required(loan_controller.list_by_reader), methods=["GET"])
+```
+
+```python
+# controllers
+def login():
+    email, password = validation.require_credentials(request.get_json(silent=True))
+    reader = auth_service.authenticate(email, password)
+    if reader is None:
+        raise UnauthorizedError("Credenciais inválidas")
+    return jsonify({"data": reader, "token": issue_token(reader["id"])}), 200
+
+
+def list_by_reader(reader_id):
+    ensure_owner_or_admin(reader_id)
+    return jsonify(loan_model.find_by_reader(reader_id)), 200
+
+
+def create():
+    data = validation.require_reader(request.get_json(silent=True))
+    data["role"] = DEFAULT_ROLE          # o papel enviado no cadastro público é ignorado
+    return jsonify(reader_service.create(**data)), 201
+```
+
+Em Node.js, o mesmo com `node:crypto`:
+
+```js
+// middlewares/auth.js
+const { createHmac, timingSafeEqual } = require('node:crypto');
+
+const TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
+
+function createAuth({ secret, readerModel }) {
+  const sign = (payload) => createHmac('sha256', secret).update(payload).digest('base64url');
+
+  function issueToken(readerId) {
+    const payload = Buffer.from(JSON.stringify({ uid: readerId, exp: Date.now() + TOKEN_TTL_MS }))
+      .toString('base64url');
+    return `${payload}.${sign(payload)}`;
+  }
+
+  async function authenticatedReader(req) {
+    const [scheme, token] = (req.get('authorization') || '').split(' ');
+    if (scheme !== 'Bearer' || !token) return null;
+    const [payload, signature] = token.split('.');
+    if (!payload || !signature) return null;
+    const expected = Buffer.from(sign(payload));
+    const received = Buffer.from(signature);
+    if (expected.length !== received.length || !timingSafeEqual(expected, received)) return null;
+    const { uid, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    if (Date.now() > exp) return null;
+    return readerModel.findById(uid); // papel lido do banco
+  }
+
+  const requireReader = asyncHandler(async (req, res, next) => {
+    req.reader = await authenticatedReader(req);
+    if (!req.reader) throw new UnauthorizedError('Autenticação necessária');
+    next();
+  });
+
+  const requireAdmin = [requireReader, (req, res, next) => {
+    if (req.reader.role !== 'admin') throw new ForbiddenError('Acesso negado');
+    next();
+  }];
+
+  return { issueToken, requireReader, requireAdmin };
+}
+```
+
+Notas:
+
+- **Nega por padrão, sempre ligado.** Não existe flag que desligue o guard nem modo "auth opcional". Sem `SECRET_KEY` no ambiente, a chave efêmera do T-02 assina e valida os tokens; eles só deixam de valer quando o processo reinicia. Controle de segurança desligado por padrão é controle ausente.
+- **401 e 403 com o envelope da API.** Use as exceções de domínio do T-12 (`UnauthorizedError` 401, `ForbiddenError` 403), com a mesma chave de erro do resto da API.
+- **O seed precisa ter um admin** com senha conhecida, para que as rotas de admin possam ser exercitadas; o README do projeto passa a dizer como obter o token (login com esse usuário).
+- **Smoke test com credencial.** O arquivo de requisições faz login como admin e como usuário comum e captura os tokens (`capture`, veja "Smoke test"). Cada rota protegida aparece três vezes: sem token (`expect_change`: 401), com o token de papel insuficiente (`expect_change`: 403) e com o token certo, que precisa devolver a resposta original.
+- **CORS:** se um finding cita CORS aberto, as origens permitidas passam a vir de `CORS_ORIGINS` e, sem a variável, nenhuma origem externa é liberada.
+
+## Limites da refatoração
+
+A refatoração não faz, sem pedido explícito, mudanças que não eliminam nenhum Impact:
+
+- **Padronizar o formato de resposta** (texto puro para JSON, novo envelope). Clientes analisam o formato atual.
 - **Renomear campos do contrato**, mesmo que ruins.
-- **Remoção de rotas**, mesmo perigosas. Elas ficam protegidas, com a recomendação de remoção.
-- **Troca de banco, de framework ou atualização maior de dependência.**
-- **Restrição de papel ou privilégio vindo do corpo da requisição**, quando o fluxo legítimo atual depende disso.
+- **Trocar de banco, de framework ou fazer atualização maior de dependência.**
 
-Quando o usuário pedir alguma dessas mudanças de forma explícita, aplique e liste em `Behavior Changes`.
+Quando uma dessas mudanças for o único jeito de eliminar um Impact, ela entra na Recommendation, é aplicada e vai para `Behavior Changes`.
+
+Nada de segurança entra nesta lista. Autenticação e autorização das rotas citadas (T-17), fim da escalação de privilégio, remoção de rotas que executam código recebido (T-06), tratamento de dependentes na exclusão (T-10), validação recomendada (T-11), validações divergentes (T-13), estado em memória (T-08) e código sem uso (T-16) são aplicados por inteiro, mesmo quando mudam o contrato.
+
+Quando a pessoa, ao confirmar a Fase 2, pede para excluir uma Recommendation, ela não é aplicada e aparece em `Not applied` no resumo final, com a ressalva.

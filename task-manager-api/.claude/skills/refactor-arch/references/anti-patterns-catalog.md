@@ -31,9 +31,10 @@ A severidade de cada entrada é o padrão. Ajuste quando o contexto mudar o impa
 ## Como registrar um finding
 
 - **Um finding por anti-pattern**, com todas as ocorrências listadas em `File:`. Vinte queries concatenadas são um finding de SQL injection com vinte locais, não vinte findings.
-- **Arquivo e linha exatos.** Confirme cada linha relendo o arquivo com números de linha (`grep -n`, `cat -n`) imediatamente antes de escrever o relatório. Linha citada de memória costuma estar errada.
+- **Arquivo e linha exatos.** Confirme cada linha relendo o arquivo com números de linha (`grep -n`, `cat -n`) imediatamente antes de escrever o relatório, numerando um arquivo por vez. Linha citada de memória, ou contada sobre vários arquivos concatenados, costuma estar errada.
 - **Evidência concreta.** A descrição diz o que o código faz naquele ponto, com o nome real da função, variável ou valor. "Código de baixa qualidade" não é um finding.
 - **Só o que está no código.** Se um sinal não aparece, o anti-pattern não entra no relatório. Não invente ocorrências para preencher uma severidade.
+- **Recommendation executável.** A Recommendation vem da transformação do playbook indicada em cada entrada abaixo e é o escopo exato da Fase 3: ações completas, sem alternativas. Ela elimina cada consequência descrita no Impact do finding e vem com a linha `Verification` (veja o template).
 
 ---
 
@@ -119,7 +120,7 @@ A severidade de cada entrada é o padrão. Ajuste quando o contexto mudar o impa
 
 **Impacto:** controle total do banco ou do servidor por qualquer cliente anônimo.
 
-**Transformação:** T-06
+**Transformação:** T-06. Rota que executa SQL, comando ou código recebido na requisição é removida, porque não tem versão segura; as demais operações destrutivas ficam atrás de credencial de administrador (o papel de admin do T-17 quando o projeto tem login; `ADMIN_TOKEN` quando não tem); o debug vem da configuração, desligado por padrão.
 
 ---
 
@@ -162,12 +163,13 @@ A severidade de cada entrada é o padrão. Ajuste quando o contexto mudar o impa
 - Conexão de banco única criada no import e compartilhada por todas as requisições (`check_same_thread=False` é um forte indício).
 - Cache global sem limite de tamanho nem expiração.
 - Singleton acessado de qualquer lugar por import, em vez de recebido como dependência.
+- Coleção guardada em atributo de um objeto que vive o processo todo (`self.notifications = []`, `this.cache = new Map()`) e que só cresce.
 
-**Não confundir com:** constantes imutáveis de módulo; conexão única exigida por banco em memória, desde que criada na composição e injetada.
+**Não confundir com:** constantes imutáveis de módulo; conexão única exigida por banco em memória, desde que criada na composição e injetada; coleção local dentro de uma função.
 
 **Impacto:** requisições concorrentes interferem entre si, testes dependem da ordem de execução e o comportamento varia com o histórico do processo.
 
-**Transformação:** T-08
+**Transformação:** T-08. Estado que ninguém lê é apagado junto com as escritas; estado que uma rota ou regra lê vai para o banco.
 
 ### AP-10 — Acoplamento forte, sem injeção de dependência
 
@@ -189,11 +191,14 @@ A severidade de cada entrada é o padrão. Ajuste quando o contexto mudar o impa
 - Token fixo ou previsível devolvido no login (`"fake-token-" + id`) e nunca verificado.
 - Papel ou privilégio aceito do corpo da requisição (`role`, `is_admin`, `tipo`) sem conferir quem está pedindo.
 - Rotas que alteram ou apagam recursos de qualquer usuário sem verificar o dono.
+- Login que devolve os dados do usuário sem emitir credencial, de modo que nada depois dele consegue saber quem está pedindo.
+- Identidade tirada do corpo ou da URL (`usuario_id` no corpo de um pedido) sem conferir com quem está autenticado.
+- Guard que existe mas fica desligado por padrão (`AUTH_REQUIRED=false`) ou protege só parte das rotas que o finding cita.
 - CORS aberto para qualquer origem combinado com os itens acima.
 
 **Impacto:** qualquer cliente lê e altera dados de qualquer usuário e pode se promover a administrador.
 
-**Transformação:** T-06 para as rotas destrutivas. Autenticação obrigatória em todas as rotas muda o contrato da API; registre o finding e não aplique sem pedido explícito (veja o playbook).
+**Transformação:** T-17, obrigatória. Autenticação e autorização das rotas citadas e o fim da escalação de privilégio são correção de segurança: entram na Recommendation e são aplicados nesta refatoração, mesmo mudando o contrato. Nunca ficam pendentes nem atrás de uma flag desligada.
 
 ---
 
@@ -222,7 +227,7 @@ A severidade de cada entrada é o padrão. Ajuste quando o contexto mudar o impa
 
 **Impacto:** uma falha no meio deixa dados inconsistentes (compra sem itens, cobrança sem registro, registros órfãos).
 
-**Transformação:** T-10
+**Transformação:** T-10. A exclusão de registro com dependentes segue a regra de T-10 (filhos apagados, referência anulada ou 409), e a Recommendation diz qual se aplica.
 
 ### AP-14 — Validação de entrada ausente ou incompleta
 
@@ -345,7 +350,7 @@ Como verificar além da tabela: compare a versão do runtime e das bibliotecas (
 
 **Impacto:** sugere dependências e comportamentos que não existem e aumenta o custo de leitura.
 
-**Transformação:** T-16
+**Transformação:** T-16. Serviço ou helper sem chamador é removido, salvo quando implementa uma regra hoje duplicada em outro lugar: então passa a ser usado (T-07, T-13).
 
 ---
 
