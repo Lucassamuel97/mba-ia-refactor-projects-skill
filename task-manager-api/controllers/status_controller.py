@@ -1,15 +1,12 @@
-"""Controller das rotas de status da API."""
 from datetime import datetime
 
-from flask import current_app
-
-
-def index():
-    return {
-        'message': current_app.config['API_NAME'],
-        'version': current_app.config['API_VERSION'],
-    }
+API_NAME = 'Task Manager API'
+API_VERSION = '1.0'
 
 
 def health():
     return {'status': 'ok', 'timestamp': str(datetime.now())}
+
+
+def index():
+    return {'message': API_NAME, 'version': API_VERSION}

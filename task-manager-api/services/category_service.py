@@ -1,42 +1,7 @@
-"""Casos de uso de categorias."""
-from database import commit_session, db
-from middlewares.errors import NotFoundError, ValidationError
+from database import transaction
+from middlewares.errors import NotFoundError
 from models.category import Category
 from models.task import Task
-from utils.helpers import DEFAULT_COLOR, is_valid_color
-
-
-# --- regras dos campos ------------------------------------------------------
-
-def _validate_name(name):
-    if not name:
-        raise ValidationError('Nome é obrigatório')
-    if not isinstance(name, str):
-        raise ValidationError('Nome inválido')
-    return name
-
-
-def _validate_description(description):
-    if description is not None and not isinstance(description, str):
-        raise ValidationError('Descrição inválida')
-    return description
-
-
-def _validate_color(color):
-    if color is not None and not is_valid_color(color):
-        raise ValidationError('Cor inválida')
-    return color
-
-
-# --- casos de uso -----------------------------------------------------------
-
-def list_categories():
-    """Categorias com a quantidade de tasks de cada uma, contada em uma única query."""
-    task_counts = Task.count_by_category()
-    return [
-        {**category.to_dict(), 'task_count': task_counts.get(category.id, 0)}
-        for category in Category.find_all()
-    ]
 
 
 def get_category(category_id):
@@ -46,33 +11,32 @@ def get_category(category_id):
     return category
 
 
-def create_category(data):
-    category = Category(
-        name=_validate_name(data.get('name')),
-        description=_validate_description(data.get('description', '')),
-        color=_validate_color(data.get('color', DEFAULT_COLOR)),
-    )
-    db.session.add(category)
-    commit_session('Erro ao criar categoria')
+def list_categories():
+    task_counts = Task.count_by_category()
+    result = []
+    for category in Category.find_all():
+        data = category.to_dict()
+        data['task_count'] = task_counts.get(category.id, 0)
+        result.append(data)
+    return result
+
+
+def create_category(fields):
+    category = Category(**fields)
+    with transaction():
+        category.add()
     return category
 
 
-def update_category(category, data):
-    changes = {}
-    if 'name' in data:
-        changes['name'] = _validate_name(data['name'])
-    if 'description' in data:
-        changes['description'] = _validate_description(data['description'])
-    if 'color' in data:
-        changes['color'] = _validate_color(data['color'])
-
-    for field, value in changes.items():
-        setattr(category, field, value)
-    commit_session('Erro ao atualizar')
+def update_category(category, fields):
+    with transaction():
+        for name, value in fields.items():
+            setattr(category, name, value)
     return category
 
 
-def delete_category(category_id):
-    category = get_category(category_id)
-    db.session.delete(category)
-    commit_session('Erro ao deletar')
+def delete_category(category):
+    """As tasks da categoria continuam existindo, sem categoria."""
+    with transaction():
+        Task.clear_category(category.id)
+        category.delete()

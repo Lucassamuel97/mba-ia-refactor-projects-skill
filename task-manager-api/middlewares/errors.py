@@ -1,6 +1,3 @@
-"""Exceções de domínio. O handler central as converte em respostas HTTP."""
-
-
 class AppError(Exception):
     status_code = 400
 
@@ -29,7 +26,3 @@ class NotFoundError(AppError):
 
 class ConflictError(AppError):
     status_code = 409
-
-
-class PersistenceError(AppError):
-    status_code = 500

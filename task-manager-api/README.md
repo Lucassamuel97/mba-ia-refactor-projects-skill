@@ -1,6 +1,6 @@
 # task-manager-api
 
-API de Task Manager em Python/Flask usada como entrada do desafio `refactor-arch`. O projeto está organizado em MVC, com as regras de negócio em services.
+API de Task Manager em Python/Flask usada como entrada do desafio `refactor-arch`. Diferente dos outros projetos, este já possui alguma separação de camadas (`models/`, `routes/`, `services/`, `utils/`), mas ainda contém problemas arquiteturais e de qualidade.
 
 ## Como rodar
 
@@ -10,43 +10,50 @@ python seed.py
 python app.py
 ```
 
-A aplicação sobe em `http://localhost:5000`. O `seed.py` popula o banco SQLite (`instance/tasks.db`) com usuários, categorias e tasks de exemplo — **rode-o antes do primeiro boot**, caso contrário os endpoints vão retornar listas vazias.
+A aplicação sobe em `http://localhost:5000`. O `seed.py` popula o banco SQLite (`tasks.db`) com usuários, categorias e tasks de exemplo — **rode-o antes do primeiro boot**, caso contrário os endpoints vão retornar listas vazias.
+
+> Se você tinha um `tasks.db` de uma versão anterior, rode `python seed.py` de novo: as senhas agora são gravadas com hash KDF (`werkzeug.security`) e os hashes MD5 antigos não são mais aceitos.
 
 ## Configuração
 
-Nenhuma variável é obrigatória. Os nomes e valores padrão estão em [.env.example](.env.example); copie-o para `.env` na raiz do projeto para alterar os padrões.
+Nenhuma variável de ambiente é obrigatória. Para configurar, copie `.env.example` para `.env`:
 
 | Variável | Padrão | Uso |
 |---|---|---|
-| `SECRET_KEY` | aleatória a cada boot | Chave do Flask |
-| `APP_HOST` | `127.0.0.1` | Use `0.0.0.0` para aceitar conexões de outras máquinas |
-| `APP_PORT` | `5000` | Porta |
-| `FLASK_DEBUG` | `false` | Modo debug do Flask. Não ligue fora do desenvolvimento |
-| `LOG_LEVEL` | `INFO` | Nível de log |
-| `DATABASE_URL` | `sqlite:///tasks.db` | URL do banco (SQLAlchemy) |
-| `CORS_ORIGINS` | `*` | Origens aceitas, separadas por vírgula |
-| `SMTP_HOST`, `SMTP_PORT` | `smtp.gmail.com`, `587` | Servidor de email do `NotificationService` |
-| `SMTP_USER`, `SMTP_PASSWORD` | ausentes | Credenciais de email. Sem elas, nenhum email é enviado |
+| `SECRET_KEY` | chave efêmera gerada no boot | assina os tokens de login |
+| `DATABASE_URL` | `sqlite:///tasks.db` | banco de dados |
+| `APP_DEBUG` | `false` | modo debug do Flask |
+| `APP_HOST` / `APP_PORT` | `0.0.0.0` / `5000` | endereço do servidor |
+| `CORS_ORIGINS` | vazio (nenhuma origem externa) | origens liberadas, separadas por vírgula |
+
+## Autenticação
+
+`POST /login` devolve um `token` assinado, válido por 8 horas. Envie-o em `Authorization: Bearer <token>`.
+O seed cria o administrador `joao@email.com` / `1234` e a usuária comum `maria@email.com` / `abcd`.
+
+```bash
+curl -s -X POST localhost:5000/login -H 'Content-Type: application/json' \
+  -d '{"email": "joao@email.com", "password": "1234"}'
+```
+
+| Política | Rotas |
+|---|---|
+| pública | `GET /`, `GET /health`, `POST /login`, `POST /users` (o `role` enviado só vale com token de admin), `GET /categories` |
+| só admin | `GET /users`, `DELETE /users/<id>`, `GET /tasks`, `GET /tasks/search`, `GET /tasks/stats`, `GET /reports/summary`, `POST/PUT/DELETE /categories` |
+| dono ou admin | `GET/PUT /users/<id>` (só admin altera `role` e `active`), `GET /users/<id>/tasks`, `GET /reports/user/<id>`, `GET/PUT/DELETE /tasks/<id>` |
+| autenticado | `POST /tasks` (quem não é admin só atribui a task a si mesmo) |
+
+Sem token, as rotas protegidas respondem `401`; com papel insuficiente, `403`.
 
 ## Estrutura
 
 ```
-app.py          composition root: monta as camadas e inicia o servidor
-config/         configuração lida do ambiente
-database.py     instância do ORM, criação do schema e commit com rollback
-models/         colunas, regras de cada entidade e consultas
-services/       casos de uso: validação das regras, referências entre entidades, relatórios
-controllers/    fluxo de cada requisição: lê a entrada, chama o service, monta a resposta
-routes/         blueprints: mapeamento de caminho para controller
-middlewares/    exceções de domínio e tratamento de erro central
-utils/          constantes de domínio e funções puras
-seed.py         dados de exemplo
+config/       configuração lida do ambiente
+models/       entidades, regras e consultas (task, user, category)
+services/     casos de uso e transações (tasks, usuários, categorias, relatórios)
+controllers/  fluxo de cada requisição e validação de entrada
+routes/       mapeamento das rotas e política de acesso
+middlewares/  erros de domínio, handler central e autenticação
+utils/        helpers e relógio UTC
+app.py        composition root
 ```
-
-As dependências apontam em um só sentido: `routes → controllers → services → models`.
-
-## Segurança
-
-- As senhas são gravadas com `werkzeug.security` (scrypt com salt). Hashes MD5 gravados por versões anteriores continuam válidos e são regravados no primeiro login bem-sucedido.
-- O hash da senha não aparece em nenhuma resposta.
-- **Pendente:** as rotas não exigem autenticação. O `token` devolvido por `POST /login` é um valor de demonstração que nenhuma rota verifica, e o campo `role` é aceito no corpo de `POST /users` e `PUT /users/<id>`. Exigir autenticação muda o contrato da API e depende de decisão do time.

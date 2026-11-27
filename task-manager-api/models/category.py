@@ -1,10 +1,11 @@
-"""Model de categorias: colunas e consultas."""
 from database import db
-from utils.helpers import DEFAULT_COLOR, utcnow
+from utils.clock import utcnow
 
 
 class Category(db.Model):
     __tablename__ = 'categories'
+
+    DEFAULT_COLOR = '#000000'
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -21,6 +22,12 @@ class Category(db.Model):
             'created_at': str(self.created_at),
         }
 
+    def add(self):
+        db.session.add(self)
+
+    def delete(self):
+        db.session.delete(self)
+
     @classmethod
     def find_by_id(cls, category_id):
         return db.session.get(cls, category_id)
@@ -30,5 +37,5 @@ class Category(db.Model):
         return db.session.scalars(db.select(cls).order_by(cls.id)).all()
 
     @classmethod
-    def count(cls):
+    def count_all(cls):
         return db.session.scalar(db.select(db.func.count()).select_from(cls))

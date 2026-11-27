@@ -1,22 +1,25 @@
-"""Model de tasks: colunas, regras da entidade e consultas."""
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from database import db
-from utils.helpers import (
-    CLOSED_STATUSES,
-    DEFAULT_PRIORITY,
-    DEFAULT_STATUS,
-    DONE_STATUS,
-    MAX_PRIORITY,
-    MIN_PRIORITY,
-    VALID_STATUSES,
-    format_date,
-    utcnow,
-)
+from utils.clock import utcnow
+from utils.helpers import format_date
 
 
 class Task(db.Model):
     __tablename__ = 'tasks'
+
+    VALID_STATUSES = ('pending', 'in_progress', 'done', 'cancelled')
+    CLOSED_STATUSES = ('done', 'cancelled')
+    DONE_STATUS = 'done'
+    DEFAULT_STATUS = 'pending'
+    MIN_TITLE_LENGTH = 3
+    MAX_TITLE_LENGTH = 200
+    MIN_PRIORITY = 1
+    MAX_PRIORITY = 5
+    DEFAULT_PRIORITY = 3
+    HIGH_PRIORITY_MAX = 2
+    PRIORITY_LABELS = {1: 'critical', 2: 'high', 3: 'medium', 4: 'low', 5: 'minimal'}
+    TAG_SEPARATOR = ','
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
@@ -33,10 +36,13 @@ class Task(db.Model):
     user = db.relationship('User', backref='tasks')
     category = db.relationship('Category', backref='tasks')
 
-    # --- serialização -----------------------------------------------------
+    # --- serialização -------------------------------------------------------
 
-    def to_dict(self, include_overdue=False, include_relations=False):
-        data = {
+    def tag_list(self):
+        return self.tags.split(self.TAG_SEPARATOR) if self.tags else []
+
+    def to_dict(self):
+        return {
             'id': self.id,
             'title': self.title,
             'description': self.description,
@@ -47,17 +53,21 @@ class Task(db.Model):
             'created_at': str(self.created_at),
             'updated_at': str(self.updated_at),
             'due_date': format_date(self.due_date),
-            'tags': self.tags.split(',') if self.tags else [],
+            'tags': self.tag_list(),
         }
-        if include_overdue:
-            data['overdue'] = self.is_overdue()
-        if include_relations:
-            data['user_name'] = self.user.name if self.user else None
-            data['category_name'] = self.category.name if self.category else None
+
+    def to_detail_dict(self, now=None):
+        data = self.to_dict()
+        data['overdue'] = self.is_overdue(now)
         return data
 
-    def to_summary_dict(self):
-        """Versão resumida, usada na listagem de tasks de um usuário."""
+    def to_list_dict(self, now=None):
+        data = self.to_detail_dict(now)
+        data['user_name'] = self.user.name if self.user else None
+        data['category_name'] = self.category.name if self.category else None
+        return data
+
+    def to_summary_dict(self, now=None):
         return {
             'id': self.id,
             'title': self.title,
@@ -66,62 +76,57 @@ class Task(db.Model):
             'priority': self.priority,
             'created_at': str(self.created_at),
             'due_date': format_date(self.due_date),
-            'overdue': self.is_overdue(),
+            'overdue': self.is_overdue(now),
         }
 
-    # --- regras da entidade -----------------------------------------------
-
-    @staticmethod
-    def validate_status(new_status):
-        return new_status in VALID_STATUSES
-
-    @staticmethod
-    def validate_priority(priority):
-        return MIN_PRIORITY <= priority <= MAX_PRIORITY
-
-    def is_overdue(self):
-        return (
-            bool(self.due_date)
-            and self.due_date < utcnow()
-            and self.status not in CLOSED_STATUSES
-        )
+    # --- regras da entidade -------------------------------------------------
 
     @classmethod
-    def _overdue_criteria(cls):
-        """A mesma regra de `is_overdue`, como filtro de consulta."""
-        return (
-            cls.due_date < utcnow(),
-            db.or_(cls.status.is_(None), cls.status.not_in(CLOSED_STATUSES)),
-        )
+    def validate_status(cls, new_status):
+        return new_status in cls.VALID_STATUSES
 
-    # --- consultas ----------------------------------------------------------
+    @classmethod
+    def validate_priority(cls, priority):
+        return (isinstance(priority, int) and not isinstance(priority, bool)
+                and cls.MIN_PRIORITY <= priority <= cls.MAX_PRIORITY)
+
+    @classmethod
+    def join_tags(cls, tags):
+        return cls.TAG_SEPARATOR.join(tags) if isinstance(tags, list) else tags
+
+    def is_overdue(self, now=None):
+        return (bool(self.due_date)
+                and self.due_date < (now or utcnow())
+                and self.status not in self.CLOSED_STATUSES)
+
+    def is_high_priority(self):
+        return self.priority <= self.HIGH_PRIORITY_MAX
+
+    # --- persistência -------------------------------------------------------
+
+    def add(self):
+        db.session.add(self)
+
+    def delete(self):
+        db.session.delete(self)
 
     @classmethod
     def find_by_id(cls, task_id):
         return db.session.get(cls, task_id)
 
     @classmethod
-    def find_all_with_relations(cls):
-        """Todas as tasks, com usuário e categoria carregados na mesma query."""
-        query = (
-            db.select(cls)
-            .options(joinedload(cls.user), joinedload(cls.category))
-            .order_by(cls.id)
-        )
+    def find_all(cls, with_relations=False):
+        query = db.select(cls).order_by(cls.id)
+        if with_relations:
+            query = query.options(selectinload(cls.user), selectinload(cls.category))
         return db.session.scalars(query).all()
 
     @classmethod
     def find_by_user(cls, user_id):
-        query = db.select(cls).where(cls.user_id == user_id).order_by(cls.id)
-        return db.session.scalars(query).all()
+        return db.session.scalars(db.select(cls).filter_by(user_id=user_id).order_by(cls.id)).all()
 
     @classmethod
-    def find_overdue(cls):
-        query = db.select(cls).where(*cls._overdue_criteria()).order_by(cls.id)
-        return db.session.scalars(query).all()
-
-    @classmethod
-    def search(cls, text='', status='', priority=None, user_id=None):
+    def search(cls, text=None, status=None, priority=None, user_id=None):
         query = db.select(cls)
         if text:
             pattern = f'%{text}%'
@@ -135,51 +140,47 @@ class Task(db.Model):
         return db.session.scalars(query.order_by(cls.id)).all()
 
     @classmethod
-    def count(cls):
-        return db.session.scalar(db.select(db.func.count()).select_from(cls))
-
-    @classmethod
-    def count_overdue(cls):
-        query = db.select(db.func.count()).select_from(cls).where(*cls._overdue_criteria())
-        return db.session.scalar(query)
-
-    @classmethod
-    def count_created_since(cls, since):
-        query = db.select(db.func.count()).select_from(cls).where(cls.created_at >= since)
-        return db.session.scalar(query)
-
-    @classmethod
-    def count_completed_since(cls, since):
-        query = (
-            db.select(db.func.count())
-            .select_from(cls)
-            .where(cls.status == DONE_STATUS, cls.updated_at >= since)
-        )
-        return db.session.scalar(query)
-
-    @classmethod
-    def _count_grouped_by(cls, column):
-        rows = db.session.execute(db.select(column, db.func.count()).group_by(column)).all()
-        return {value: total for value, total in rows}
-
-    @classmethod
     def count_by_status(cls):
-        return cls._count_grouped_by(cls.status)
+        rows = db.session.execute(db.select(cls.status, db.func.count()).group_by(cls.status)).all()
+        return {status: count for status, count in rows}
 
     @classmethod
-    def count_by_priority(cls):
-        return cls._count_grouped_by(cls.priority)
+    def count_by_user_status_priority(cls):
+        """Uma linha por (user_id, status, priority) com a contagem de tasks."""
+        return db.session.execute(
+            db.select(cls.user_id, cls.status, cls.priority, db.func.count())
+            .group_by(cls.user_id, cls.status, cls.priority)
+        ).all()
 
     @classmethod
     def count_by_user(cls):
-        return cls._count_grouped_by(cls.user_id)
+        rows = db.session.execute(
+            db.select(cls.user_id, db.func.count()).group_by(cls.user_id)
+        ).all()
+        return {user_id: count for user_id, count in rows}
 
     @classmethod
     def count_by_category(cls):
-        return cls._count_grouped_by(cls.category_id)
+        rows = db.session.execute(
+            db.select(cls.category_id, db.func.count()).group_by(cls.category_id)
+        ).all()
+        return {category_id: count for category_id, count in rows}
 
     @classmethod
-    def count_by_user_and_status(cls):
-        """Contagem por (user_id, status), em uma única query."""
-        query = db.select(cls.user_id, cls.status, db.func.count()).group_by(cls.user_id, cls.status)
-        return {(user_id, status): total for user_id, status, total in db.session.execute(query)}
+    def count_recent_activity(cls, since):
+        """(tasks criadas desde `since`, tasks concluídas e atualizadas desde `since`)."""
+        created = db.func.count(db.case((cls.created_at >= since, 1)))
+        completed = db.func.count(db.case(
+            (db.and_(cls.status == cls.DONE_STATUS, cls.updated_at >= since), 1)))
+        return tuple(db.session.execute(db.select(created, completed)).one())
+
+    @classmethod
+    def clear_category(cls, category_id):
+        db.session.execute(
+            db.update(cls).where(cls.category_id == category_id).values(category_id=None)
+        )
+
+    @classmethod
+    def delete_by_user(cls, user_id):
+        for task in cls.find_by_user(user_id):
+            task.delete()

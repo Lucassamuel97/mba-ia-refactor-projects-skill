@@ -1,12 +1,11 @@
 """Script para popular o banco com dados iniciais"""
 from datetime import timedelta
 
-from app import app
-from database import db
+from app import app, db
 from models.category import Category
 from models.task import Task
 from models.user import User
-from utils.helpers import utcnow
+from utils.clock import utcnow
 
 def seed_data():
     with app.app_context():
@@ -78,14 +77,25 @@ def seed_data():
             {'title': 'Melhorar validações de input', 'description': 'Usar marshmallow ou pydantic', 'status': 'pending', 'priority': 3, 'user_id': u1.id, 'category_id': c1.id, 'tags': 'improvement,validation'},
         ]
 
-        for task_data in tasks_data:
-            db.session.add(Task(**task_data))
+        for td in tasks_data:
+            t = Task()
+            t.title = td['title']
+            t.description = td['description']
+            t.status = td['status']
+            t.priority = td['priority']
+            t.user_id = td['user_id']
+            t.category_id = td['category_id']
+            if 'due_date' in td:
+                t.due_date = td['due_date']
+            if 'tags' in td:
+                t.tags = td['tags']
+            db.session.add(t)
 
         db.session.commit()
         print("Seed concluído com sucesso!")
-        print(f"  {User.count()} usuários")
-        print(f"  {Category.count()} categorias")
-        print(f"  {Task.count()} tasks")
+        print(f"  {User.count_all()} usuários")
+        print(f"  {Category.count_all()} categorias")
+        print(f"  {len(Task.find_all())} tasks")
 
 if __name__ == '__main__':
     seed_data()
