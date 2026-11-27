@@ -56,14 +56,16 @@ Para conferir, abra o Claude Code na pasta do projeto e digite `/`: `refactor-ar
 
 3. **Confira a Fase 1.** A skill imprime o bloco `PHASE 1: PROJECT ANALYSIS` com linguagem, framework, banco, domínio, arquitetura atual e número de rotas. Se algo estiver errado aqui (o framework, o número de arquivos), corrija antes de seguir: as outras fases dependem disso.
 
-4. **Leia o relatório da Fase 2.** Cada finding traz severidade, arquivo e linha, descrição, impacto e recomendação. Nenhum arquivo foi alterado até este ponto.
+4. **Leia o relatório da Fase 2.** Cada finding traz severidade, arquivo e linha, descrição, impacto e `Recommendation`. Nenhum arquivo foi alterado até este ponto.
+
+   Leia a `Recommendation` como um contrato: é exatamente o que a Fase 3 vai fazer, por inteiro, inclusive as respostas da API que ela anuncia que vão mudar. A Recommendation elimina tudo o que o `Impact` descreve, e a linha `Verification` diz como a Fase 3 vai provar isso. Correções de segurança, inclusive exigir autenticação em rotas que hoje respondem a qualquer um, fazem parte da refatoração mesmo quando mudam o contrato: leia com atenção as respostas que o relatório anuncia que vão mudar.
 
 5. **Responda à pergunta de confirmação.**
 
    | Resposta | O que acontece |
    |---|---|
    | `y` | A skill segue para a refatoração |
-   | `y`, com ressalvas ("sim, mas não mexa no módulo de pagamentos") | Refatora respeitando as ressalvas e as lista no resumo final |
+   | `y`, com ressalvas ("sim, mas não remova a rota X") | As Recommendations excluídas não são aplicadas e aparecem em `Not applied`; as demais são aplicadas por inteiro |
    | `n` | Nada é alterado; a skill oferece salvar o relatório |
    | Uma pergunta sobre o relatório | A skill responde e pergunta de novo; dúvida não conta como confirmação |
 
@@ -74,7 +76,8 @@ Para conferir, abra o Claude Code na pasta do projeto e digite `/`: `refactor-ar
 7. **Revise o resumo final** (`PHASE 3: REFACTORING COMPLETE`) antes de commitar:
 
    - `Behavior Changes` lista toda diferença de resposta entre antes e depois. Leia com atenção: é ali que aparece o que seus clientes vão notar.
-   - `Partial` e `Deferred` listam o que não foi corrigido e por quê.
+   - `Not applied` lista as Recommendations que você excluiu.
+   - `Recommendations applied as written` só tem `✓` depois de cada Recommendation ser conferida contra o código final, e `Impact verified gone for every finding`, depois de cada `Verification` ser executada.
    - `Validation` mostra `✓` só para o que foi verificado; um `✗` vem com a explicação.
    - Rode os testes do projeto e leia o `git diff`.
 
@@ -84,14 +87,17 @@ Para conferir, abra o Claude Code na pasta do projeto e digite `/`: `refactor-ar
 
 Faz:
 
-- Preserva rotas, payloads, status codes, mensagens e o comando de start.
+- Aplica cada Recommendation aprovada por inteiro, como escrita no relatório, e nada além delas.
+- Preserva rotas, payloads, status codes, mensagens e o comando de start, exceto nas mudanças que as Recommendations anunciam.
 - Tira segredos do código, sem exigir configuração nova para a aplicação subir.
 - Corrige injeção de SQL, senhas sem hash, exposição de dados sensíveis, N+1, falta de transação e de validação, entre os 22 anti-patterns do catálogo.
-- Protege rotas administrativas e destrutivas com um token lido do ambiente. Sem o token configurado, elas respondem 403.
+- Remove rotas que executam SQL, comando ou código recebido na requisição, porque elas não têm versão segura.
+- Exige autenticação nas rotas citadas em findings de segurança: o login passa a devolver um token assinado, um guard único nega por padrão (401 sem token, 403 sem papel suficiente) e o papel do usuário passa a ser definido só pelo servidor. Projetos sem login protegem as rotas administrativas com um token lido do ambiente; sem ele configurado, elas respondem 403.
+- Trata os registros dependentes na exclusão: apaga os que só existem em função do pai, anula referências opcionais e recusa com 409 a exclusão de quem tem histórico ou registro financeiro.
 
 Não faz sem pedido explícito:
 
-- Exigir autenticação nas rotas de negócio, mudar o formato das respostas, renomear campos da API ou remover rotas. Tudo isso quebraria os clientes atuais, então entra no relatório e fica em `Deferred`.
+- Padronizar o formato das respostas, renomear campos da API ou trocar de framework e de banco, a menos que isso seja o único jeito de eliminar o Impact de um finding.
 - Trocar de framework, de banco ou introduzir um ORM.
 - Commitar ou alterar o histórico do git. Segredos que já foram versionados continuam no histórico e precisam ser rotacionados por você.
 
@@ -102,7 +108,7 @@ Não faz sem pedido explícito:
 - **Prova de que nada quebrou.** A validação compara as respostas reais dos endpoints antes e depois, em vez de confiar em inspeção. As mudanças esperadas são declaradas antes da comparação, para uma regressão não passar como intencional.
 - **Funciona em stacks diferentes.** A mesma pasta, sem alteração, refatorou dois projetos Flask e um Express, um deles um monolito e outro já parcialmente organizado.
 - **Adapta-se ao ponto de partida.** Em um monolito cria a estrutura completa; em um projeto com camadas, mantém o que está certo e cria só o que falta.
-- **Não esconde o que ficou pendente.** O resumo final separa o que foi resolvido, o que foi resolvido em parte e o que foi adiado, com o motivo.
+- **O relatório é o contrato.** O que a Fase 2 recomenda é o que a Fase 3 faz, por inteiro, e cada finding traz a verificação que prova que o impacto descrito deixou de acontecer.
 - **Detecta APIs deprecated** e troca pelo equivalente moderno, cuidando para o resultado continuar igual (por exemplo, o formato das datas).
 - **É personalizável sem código.** O catálogo, as guidelines e o playbook são arquivos Markdown.
 

@@ -88,30 +88,108 @@ A severidade segue a escala do [enunciado](desafio.md#definição-de-severidades
 
 | Projeto | CRITICAL | HIGH | MEDIUM | LOW | Total |
 |---|---|---|---|---|---|
-| code-smells-project | 4 | 2 | 5 | 3 | 14 |
+| code-smells-project | 7 | 5 | 3 | 4 | 19 | 19 de 19, com Impact verificado | [audit-project-1.md](reports/audit-project-1.md) |
 | ecommerce-api-legacy | 4 | 3 | 5 | 3 | 15 |
 | task-manager-api | 5 | 2 | 6 | 4 | 17 |
 
-### Projeto 1 — code-smells-project (Python/Flask)
+### Projeto 1 — code-smells-project
 
-API de e-commerce em 4 arquivos. Os nomes `controllers.py` e `models.py` sugerem camadas, mas cada um é um arquivo único para todos os domínios, e as responsabilidades estão misturadas.
+Resultado da execução com a skill da iteração 3. O relatório tem 19 findings (7 CRITICAL, 5 HIGH, 3 MEDIUM, 4 LOW) e cobre os 14 problemas da análise manual. Cada finding traz uma Recommendation que elimina todo o Impact e uma linha `Verification`.
 
-| # | Severidade | Problema | Onde | Por que é relevante |
-|---|---|---|---|---|
-| 1 | CRITICAL | SQL injection por concatenação de strings | `models.py`, em toda query com parâmetro (ex.: `28`, `47-50`, `109-111`, `289-299`) | Qualquer campo de entrada altera o SQL. Confirmado: login com email `admin@loja.com' --` autentica como admin sem senha. |
-| 2 | CRITICAL | Rotas administrativas sem autenticação | `app.py:47-57` (reset do banco), `app.py:59-78` (SQL arbitrário) | Uma única requisição anônima lê, altera ou apaga o banco inteiro. |
-| 3 | CRITICAL | Segredos hardcoded e expostos | `app.py:7` (`SECRET_KEY`), `controllers.py:289` (`/health` devolve a chave), `app.py:8, 88` (debug ligado em `0.0.0.0`) | A chave está no repositório e também é entregue a qualquer cliente que chame `/health`. |
-| 4 | CRITICAL | Senhas em texto puro, devolvidas pela API | `database.py:75-79`, `models.py:83, 99, 109-111, 126-129` | `GET /usuarios` lista a senha de todos os usuários; um vazamento do banco expõe todas as contas. |
-| 5 | HIGH | Regra de negócio na camada de dados | `models.py:133-169` (valida estoque, calcula total e baixa estoque), `models.py:256-262` (faixas de desconto) | Não dá para testar a regra sem banco, nem trocar a persistência sem reescrever a regra. |
-| 6 | HIGH | Estado global mutável: uma conexão para toda a aplicação | `database.py:4-10`; schema e seed dentro de `get_db` (`database.py:14-84`) | Todas as requisições compartilham a mesma conexão e a mesma transação, com `check_same_thread=False`. |
-| 7 | MEDIUM | Queries N+1 na listagem de pedidos | `models.py:171-201`, `models.py:203-233` | Uma query por pedido e outra por item; o custo cresce com o volume de pedidos. |
-| 8 | MEDIUM | Validação ausente | `models.py:144-166`, `controllers.py:43, 169-170, 195-203`, `database.py:30` (email sem `UNIQUE`) | Confirmado: pedido com quantidade `-5` gera total negativo e aumenta o estoque; usuário inexistente cria pedido; email duplicado é aceito; preço como texto devolve 500. |
-| 9 | MEDIUM | Pedido gravado sem transação nem rollback | `models.py:148-168` | Se uma escrita falhar no meio, as anteriores ficam pendentes na conexão global e são gravadas pelo próximo `commit`. |
-| 10 | MEDIUM | Tratamento de erro repetido e vazando detalhes internos | `controllers.py`, `try/except Exception` nas 16 funções (ex.: `10-12`, `60-62`) | Não há handler central, e a mensagem interna vai para o cliente. Confirmado: uma busca com aspas devolve o erro de sintaxe do SQLite. |
-| 11 | MEDIUM | Código duplicado | `models.py:12-21, 31-40, 304-313` (linha para dicionário), `models.py:171-201` e `203-233`, `controllers.py:28-46` e `72-90` | Cada correção precisa ser repetida em vários lugares, e as cópias já divergem (a atualização de produto não valida nome nem categoria). |
-| 12 | LOW | `print` como log e notificações simuladas | `controllers.py:8, 57, 208-210, 248-250`, `app.py:56, 83-86` | Sem níveis nem destino configurável; email, SMS e push são apenas `print` dentro do controller. |
-| 13 | LOW | Magic numbers e listas soltas | `models.py:257-262` (faixas de desconto), `controllers.py:47-52, 242` (limites, categorias, status) | As regras ficam escondidas em literais, sem nome e sem um lugar único para alterar. |
-| 14 | LOW | Nomes que sombreiam built-ins e import sem uso | `id` como parâmetro (`controllers.py:14, 64, 98, 136`, `models.py:24, 54, 65, 89`), `import sqlite3` (`models.py:2`) | Ruído de leitura e risco de erro sutil ao usar `id()` dentro dessas funções. |
+**Findings resolvidos:** 19 de 19, cada Recommendation aplicada como escrita e cada Impact verificado.
+
+- **`/admin/query`:** removida (rota, handler e código que executava SQL recebido); responde 404.
+- **Autenticação (CRITICAL):** o login devolve um token assinado (`itsdangerous`, válido por 8 horas); um guard único nega por padrão e lê o papel do banco. Públicas: `GET /`, `GET /health`, leitura e busca de produtos, cadastro e login. Dono ou admin: `GET /usuarios/<id>`, `GET /pedidos/usuario/<id>`. Usuário autenticado: `POST /pedidos`, com o dono vindo do token. Só admin: escrita de produtos, listagem de usuários e pedidos, status de pedido, relatório de vendas e reset.
+- **Exclusão de produto com pedidos:** responde 409, sem apagar o histórico.
+- **Validação:** `PUT /produtos` usa a mesma regra do `POST`; quantidade menor que 1, usuário inexistente e tipos errados respondem 400.
+- **CORS:** só as origens de `CORS_ORIGINS`; sem a variável, nenhuma origem externa.
+
+**Estrutura antes e depois:**
+
+```
+ANTES                         DEPOIS
+app.py                        app.py                (composition root)
+controllers.py                config/settings.py
+models.py                     database/             connection, schema
+database.py                   models/               produto, usuario, pedido, sistema, admin
+                              services/             pedido, relatorio, notificacao
+                              controllers/          produto, usuario, pedido, relatorio, sistema, admin, validacao
+                              routes/               um blueprint por domínio
+                              middlewares/          auth, erros, error_handler
+                              .env.example
+```
+
+O código passou de 4 arquivos e 780 linhas para 28 módulos e cerca de 1.080 linhas.
+
+**Validação:**
+
+- **Boot:** `python app.py` sobe sem nenhuma variável de ambiente, com debug desligado, também com avisos de depreciação tratados como erro.
+- **Smoke test da skill:** 89 requisições, com login e token; 37 respostas idênticas às originais e 52 mudanças intencionais, todas declaradas antes da comparação.
+- **Linha de base independente com o token de admin** (`SMOKE_HEADERS='{"Authorization":"Bearer ${admin}"}' bash baseline/run.sh 1`): 32 de 40 respostas idênticas a [baseline/project-1.txt](baseline/project-1.txt). As 8 diferenças são as 6 marcadas como "deve mudar" e 2 consequências delas (`/admin/query` sem `sql` responde 404; o `/health` final já não expõe a chave).
+- **Política de acesso e Verification:** 52 verificações com o test client do Flask, todas aprovadas. Cada rota de admin sem token responde 401, com token adulterado 401 e com token de cliente 403. As rotas de dono respondem 403 para outro usuário e 200 para o próprio. Um pedido em nome de outro usuário responde 403. As rotas públicas continuam abertas. O cadastro com `"tipo": "admin"` grava `cliente`. Os demais casos também passaram: injeção no login, `/admin/query` (404), 409 na exclusão, validação do `PUT` e CORS para origem externa.
+- **Nova varredura:** nenhum `print`, nenhum `except` genérico, nenhum segredo literal, nenhuma flag que desligue a autenticação.
+- **Relatório:** 128 referências de arquivo e linha. Três delas, em `database.py`, saíram com a numeração continuada de um `cat -n` de vários arquivos (por exemplo `database.py:164-166` em vez de `76-78`); foram corrigidas no relatório, e a skill passou a exigir numeração de um arquivo por vez.
+
+Log do boot e das primeiras requisições após a refatoração:
+
+```
+INFO database.schema: Banco inicializado com dados de exemplo
+INFO __main__: SERVIDOR INICIADO - rodando em http://localhost:5000
+ * Serving Flask app 'app'
+ * Debug mode: off
+ * Running on http://127.0.0.1:5000
+INFO werkzeug: "GET / HTTP/1.1" 200 -
+INFO controllers.usuario_controller: Login bem-sucedido: usuario 1
+INFO werkzeug: "POST /login HTTP/1.1" 200 -
+INFO werkzeug: "GET /health HTTP/1.1" 200 -
+INFO controllers.produto_controller: Listando 10 produtos
+```
+
+**Mudanças de comportamento**, todas anunciadas nas Recommendations:
+
+- Rotas protegidas respondem 401 sem token e 403 sem papel suficiente; com o token certo, a resposta é a de antes. O login passa a devolver o campo `token`.
+- `POST /admin/query` deixou de existir (404).
+- `GET /health`, `GET /usuarios` e `GET /usuarios/<id>` deixaram de expor chave, caminho do banco e senhas.
+- Login com injeção responde 401; senhas gravadas com hash.
+- `DELETE /produtos/<id>` responde 409 enquanto o produto estiver em pedidos.
+- Entradas inválidas respondem 400; email duplicado, 409; status de pedido inexistente, 404; erros internos, mensagem genérica.
+- CORS fechado por padrão; debug desligado por padrão.
+
+**Como chamar uma rota protegida:**
+
+```bash
+TOKEN=$(curl -s -X POST localhost:5000/login -H 'Content-Type: application/json' \
+  -d '{"email":"admin@loja.com","senha":"admin123"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+curl -H "Authorization: Bearer $TOKEN" localhost:5000/usuarios
+```
+
+**Checklist de validação:**
+
+Fase 1 — Análise
+- [x] Linguagem detectada corretamente (Python)
+- [x] Framework detectado corretamente (Flask 3.1.1)
+- [x] Domínio da aplicação descrito corretamente (API de e-commerce: produtos, usuários, pedidos, relatório de vendas)
+- [x] Número de arquivos analisados condiz com a realidade (4 arquivos, 780 linhas, 19 rotas)
+
+Fase 2 — Auditoria
+- [x] Relatório segue o template definido nos arquivos de referência
+- [x] Cada finding tem arquivo e linhas exatos (três referências corrigidas, veja acima)
+- [x] Findings ordenados por severidade (CRITICAL → LOW)
+- [x] Mínimo de 5 findings identificados (19)
+- [x] Detecção de APIs deprecated incluída (`Deprecated APIs: none detected`)
+- [x] Skill pausa e pede confirmação antes da Fase 3
+
+Fase 3 — Refatoração
+- [x] Estrutura de diretórios segue padrão MVC
+- [x] Configuração extraída para módulo de config (sem hardcoded)
+- [x] Models criados para abstrair dados
+- [x] Views/Routes separadas para visualização ou roteamento
+- [x] Controllers concentram o fluxo da aplicação
+- [x] Error handling centralizado
+- [x] Entry point claro
+- [x] Aplicação inicia sem erros
+- [x] Endpoints originais respondem corretamente (com o token certo nas rotas protegidas)
+- [x] Cada Recommendation aplicada como escrita e cada Impact verificado (19/19)
 
 ### Projeto 2 — ecommerce-api-legacy (Node.js/Express)
 
@@ -193,19 +271,19 @@ Os mesmos problemas aparecem nas duas stacks, o que orienta o catálogo da skill
 | Catálogo de anti-patterns | `anti-patterns-catalog.md` | 22 anti-patterns com sinais de detecção, severidade e a transformação que resolve cada um; tabela de APIs deprecated |
 | Template de relatório | `report-template.md` | Formato do relatório da Fase 2 e do resumo da Fase 3, com regras de preenchimento |
 | Guidelines de arquitetura | `mvc-guidelines.md` | Camadas do MVC alvo, responsabilidade de cada uma, regra de dependência, contrato HTTP a preservar |
-| Playbook de refatoração | `refactoring-playbook.md` | Ordem de execução, smoke test e 16 transformações com código antes e depois |
+| Playbook de refatoração | `refactoring-playbook.md` | Ordem de execução, smoke test e 17 transformações com código antes e depois, inclusive autenticação e autorização por padrão |
 
 ### Decisões de design
 
 - **`SKILL.md` curto, conhecimento nas referências.** O `SKILL.md` tem menos de 100 linhas e só descreve o que fazer em cada fase. Cada referência é lida no início da fase que a usa, então o agente não carrega o playbook de refatoração enquanto ainda está analisando o projeto.
-- **Três compromissos explícitos, com o motivo.** Nada é alterado antes da confirmação; o comportamento é preservado; o resultado é reportado como foi. A skill explica por que cada regra existe, em vez de só impor, para que o agente saiba decidir nos casos que o texto não prevê.
+- **Quatro compromissos explícitos, com o motivo.** Nada é alterado antes da confirmação; o que a Fase 2 recomenda é o que a Fase 3 faz; o resto do comportamento é preservado; o resultado é reportado como foi. A skill explica por que cada regra existe, em vez de só impor, para que o agente saiba decidir nos casos que o texto não prevê.
 - **Fases 1 e 2 somente leitura.** Nem dependências são instaladas antes da confirmação. O relatório só é gravado em arquivo depois da resposta do usuário.
 - **Pausa como fim de resposta.** A Fase 2 termina com a pergunta `Proceed with refactoring (Phase 3)? [y/n]` e o agente para. Comentário ou dúvida sobre o relatório não vale como confirmação.
 - **Um finding por anti-pattern.** Todas as ocorrências ficam na linha `File:`, com as linhas conferidas por releitura numerada antes de escrever. Isso evita relatórios inflados e linhas citadas de memória.
-- **Contrato HTTP preservado.** Rotas, payloads, status codes, mensagens e o comando de start não mudam. As exceções são correções de segurança, e toda diferença aparece em `Behavior Changes` no resumo final.
+- **Contrato HTTP preservado, exceto o que a Recommendation anuncia.** Rotas, payloads, status codes, mensagens e o comando de start não mudam, salvo as mudanças descritas nas Recommendations aprovadas (campo sensível removido, rota de SQL arbitrário removida, exclusão com dependentes recusada, entrada inválida recusada). Toda diferença aparece em `Behavior Changes` no resumo final.
 - **Validação por comparação, não por inspeção.** O script `http_smoke.py` grava as respostas de todos os endpoints antes da refatoração e compara com as de depois. As mudanças esperadas são declaradas antes de rodar o "depois", para que uma regressão não seja racionalizada como intencional.
 - **A aplicação sobe sem configuração nova.** Segredos saem do código, mas a ausência deles no ambiente não impede o boot: chaves efêmeras em desenvolvimento e integrações desligadas quando sem credencial.
-- **Lista do que não aplicar sozinha.** Autenticação obrigatória em todas as rotas, mudança de formato de resposta e remoção de rotas quebrariam os clientes. Esses findings entram no relatório e ficam em `Deferred`, com o motivo.
+- **A Recommendation é um contrato e fecha o Impact.** A Recommendation de cada finding descreve exatamente o que a Fase 3 vai fazer, sem alternativas, e elimina cada consequência descrita no `Impact`. A Fase 3 a aplica por inteiro e executa a linha `Verification` de cada finding para provar que o Impact não acontece mais. Segurança nunca é adiada como decisão de produto.
 - **`✓` só com prova.** O resumo final marca `✓` apenas no que foi verificado na execução; o que falhou aparece como `✗`.
 
 ### Anti-patterns do catálogo
@@ -232,7 +310,7 @@ Cada entrada traz sinais concretos ("query dentro de laço que percorre o result
 
 ### Desafios encontrados
 
-- **Preservar endpoints e corrigir falhas ao mesmo tempo.** Algumas rotas originais são a própria vulnerabilidade (SQL arbitrário, senha na resposta). A solução foi separar "contrato a preservar" de "mudanças de segurança permitidas", manter rotas perigosas respondendo com 403 por padrão e exigir que cada mudança seja declarada antes da validação.
+- **Preservar endpoints e corrigir falhas ao mesmo tempo.** Algumas rotas originais são a própria vulnerabilidade (SQL arbitrário, senha na resposta). A primeira versão resolveu o conflito do lado errado: preservava a rota de SQL arbitrário atrás de um token, mesmo com a Recommendation dizendo remover. A versão atual separa o que não tem versão segura (removido) do que tem (protegido), e o contrato só cede onde a Recommendation anuncia (veja "Iteração 2").
 - **Servidor antigo esquecido no ar.** Ao testar o script, a segunda execução falou com o processo da primeira, porque o PID guardado era o do `npm start` e não o do servidor. O playbook passou a mandar conferir a porta antes de cada boot e encerrar o processo pela porta.
 - **Troca de `datetime.utcnow()`.** O substituto direto devolve data com fuso, o que quebra comparações com o banco e muda o formato das respostas. O playbook traz um helper que mantém UTC sem fuso.
 - **Banco em memória.** Conexão por requisição, a correção usual para conexão global, esvaziaria um banco `:memory:`. O playbook trata o caso: conexão única, criada na composição e injetada.
@@ -244,11 +322,35 @@ Antes das execuções completas, as duas fases de leitura foram ensaiadas no pro
 
 ### Iterações
 
-- **Projeto 1:** a execução completa funcionou na primeira tentativa. O único ajuste na skill veio do resumo final: a execução reportou três findings "resolvidos com ressalva", categoria que o template não previa, e o template ganhou a seção `Partial`.
-- **Projeto 2:** a mesma skill, copiada sem alteração, funcionou na primeira tentativa em Node.js/Express. Nenhum ajuste foi necessário.
-- **Projeto 3:** a mesma skill, de novo sem alteração, funcionou na primeira tentativa em um projeto já parcialmente organizado. Ela manteve `models/`, `routes/`, `services/` e `utils/` e criou só as camadas que faltavam.
+**Iteração 1.** As três execuções completas passaram na primeira tentativa, com a mesma skill. O único ajuste foi no template: a execução do projeto 1 reportou findings "resolvidos com ressalva", e o resumo final ganhou a seção `Partial`.
 
-No total, a skill precisou de uma única alteração depois de escrita (a seção `Partial` do template), e as três execuções completas passaram na primeira tentativa.
+**Iteração 2 — revisão do desafio.** A correção apontou que a Fase 3 aplicava menos do que a Fase 2 recomendava. No projeto 1, o finding CRITICAL recomendava remover `/admin/query`, e a rota ficou, executando qualquer SQL para quem tivesse o token. No projeto 2, a Recommendation de transação mandava remover matrículas e pagamentos junto com o usuário, e a exclusão continuou deixando órfãos. Conferindo os três relatórios, o mesmo desvio aparecia em outros pontos: `pwd` obrigatório e `:id` validado no projeto 2, validação compartilhada na atualização de produto no projeto 1.
+
+A causa estava na própria skill: a nota do T-06 mandava proteger a rota e só recomendar a remoção, o playbook proibia remover rotas, a preservação do contrato vencia a Recommendation, e o template oferecia `Partial` e `Deferred` como saída. O que mudou:
+
+- **Recommendation como escopo exato da Fase 3.** Virou compromisso no `SKILL.md` e primeira regra do playbook. A Fase 2 passa a ler o playbook para escrevê-la: ações completas, sem alternativas ("ou", "decidir depois"), anunciando a resposta da API que muda. A Fase 3 aplica cada uma por inteiro e confere ação por ação antes de concluir; se uma se mostrar inviável, pergunta em vez de amenizar.
+- **Linha `Decision needed`.** O que depende de decisão do produto sai da Recommendation e fica numa linha própria do finding. Só é aplicado se o usuário incluir na confirmação.
+- **T-06 — remover ou proteger.** Rota que executa SQL, comando ou código recebido na requisição é removida, porque não tem versão segura; só operações com versão segura ficam atrás de token.
+- **T-10 — exclusão com dependentes.** Regra para escolher entre apagar os filhos, anular a referência ou recusar com 409 quando os filhos são histórico ou registro financeiro.
+- **T-05, T-11, T-13 e T-16.** Senha padrão, validação recomendada, validações divergentes e serviços sem chamador deixaram de ter uma saída "adiada": a Recommendation escolhe, e a Fase 3 faz.
+- **Resumo final sem meio-termo.** `Partial` e `Deferred` deram lugar a `Resolved`, `Not applied` (só o que o usuário excluiu) e `Decisions pending`, e a validação ganhou a linha `Recommendations applied as written`.
+
+**Iteração 3 — conferência contra as devolutivas de outros forks.** Antes de reenviar, a execução do projeto 1 com a skill da iteração 2 foi comparada com os 289 forks públicos do repositório base que entregaram o projeto 1 completo. As mensagens de commit e os READMEs de quem reenviou depois de uma revisão mostram o critério que os corretores aplicam, e ele é mais forte que "aplicar a Recommendation":
+
+- a Recommendation precisa eliminar **todo** o Impact do finding; um finding cujo Impact era "qualquer um lista usuários, pedidos e faturamento" foi devolvido porque só as rotas administrativas ganharam proteção;
+- autenticação, autorização e escalação de privilégio não podem ser adiadas como "decisão de produto" nem ficar atrás de uma flag desligada;
+- toda rota citada num finding de autenticação precisa responder 401 sem credencial;
+- estado em memória sem leitor e serviços sem chamador são removidos.
+
+A iteração 2 ainda deixava a autenticação das rotas de negócio na linha `Decision needed`, que era justamente o caso devolvido em outros forks. O que mudou:
+
+- **Recommendation fecha o Impact inteiro, e cada finding ganha `Verification`.** A linha diz como a Fase 3 prova que o Impact sumiu (requisição e resposta esperada, ou checagem no código), e a Fase 3 a executa com a aplicação nos padrões versionados.
+- **`Decision needed` removida.** Segurança é corrigida nesta refatoração, mesmo mudando o contrato; os limites da refatoração ficaram só com o que não elimina Impact (formato de resposta, nomes de campos, troca de tecnologia).
+- **T-17 — autenticação e autorização por padrão.** Política para cada rota (pública, dono ou admin, admin), token assinado no login sem dependência nova (`itsdangerous` no Flask, `node:crypto` no Node), guard único que nega por padrão e lê o papel do banco, dono do recurso tirado do token e papel definido só pelo servidor.
+- **AP-09 e T-08 — estado em memória.** Coleções em objetos que vivem o processo todo entram como estado global; sem leitor, são apagadas.
+- **Smoke test com credencial.** `http_smoke.py` passou a capturar o token do login e reutilizá-lo nas chamadas seguintes, para provar que cada rota protegida devolve a resposta original com o token certo.
+
+Com a skill corrigida, os três projetos voltaram mais uma vez ao código legado original e a skill foi executada de novo em cada um.
 
 ## Resultados
 
@@ -256,7 +358,7 @@ No total, a skill precisou de uma única alteração depois de escrita (a seçã
 
 | Projeto | CRITICAL | HIGH | MEDIUM | LOW | Total | Resolvidos | Relatório |
 |---|---|---|---|---|---|---|---|
-| code-smells-project | 6 | 6 | 4 | 4 | 20 | 19 (3 parciais), 1 adiado | [audit-project-1.md](reports/audit-project-1.md) |
+| code-smells-project | 6 | 5 | 4 | 4 | 19 | 19 de 19, como recomendado; 1 decisão pendente | [audit-project-1.md](reports/audit-project-1.md) |
 | ecommerce-api-legacy | 5 | 6 | 4 | 4 | 19 | 19 (3 parciais), nenhum adiado | [audit-project-2.md](reports/audit-project-2.md) |
 | task-manager-api | 4 | 3 | 7 | 5 | 19 | 18 (1 parcial), 1 adiado | [audit-project-3.md](reports/audit-project-3.md) |
 
