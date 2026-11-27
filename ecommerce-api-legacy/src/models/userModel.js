@@ -4,12 +4,14 @@ class UserModel {
     }
 
     findByEmail(email) {
-        return this.db.get('SELECT id FROM users WHERE email = ?', [email]);
+        return this.db.get('SELECT id, pass FROM users WHERE email = ?', [email]);
     }
 
     async create({ name, email, passwordHash }) {
-        const { lastID } = await this.db.run('INSERT INTO users (name, email, pass) VALUES (?, ?, ?)',
-            [name, email, passwordHash]);
+        const { lastID } = await this.db.run(
+            'INSERT INTO users (name, email, pass) VALUES (?, ?, ?)',
+            [name, email, passwordHash],
+        );
         return lastID;
     }
 
@@ -18,4 +20,4 @@ class UserModel {
     }
 }
 
-module.exports = UserModel;
+module.exports = { UserModel };

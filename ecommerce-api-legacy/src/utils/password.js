@@ -1,15 +1,22 @@
-const { randomBytes, scrypt } = require('node:crypto');
+const { randomBytes, scrypt, timingSafeEqual } = require('node:crypto');
 const { promisify } = require('node:util');
 
 const scryptAsync = promisify(scrypt);
-const SALT_BYTES = 16;
-const KEY_BYTES = 64;
+const KEY_LENGTH = 64;
+const SCHEME = 'scrypt';
 
-// Formato gravado: scrypt$<salt hex>$<hash hex>
 async function hashPassword(password) {
-    const salt = randomBytes(SALT_BYTES).toString('hex');
-    const key = await scryptAsync(password, salt, KEY_BYTES);
-    return `scrypt$${salt}$${key.toString('hex')}`;
+    const salt = randomBytes(16).toString('hex');
+    const hash = await scryptAsync(password, salt, KEY_LENGTH);
+    return `${SCHEME}$${salt}$${hash.toString('hex')}`;
 }
 
-module.exports = { hashPassword };
+async function verifyPassword(password, stored) {
+    const [scheme, salt, hash] = String(stored).split('$');
+    if (scheme !== SCHEME || !salt || !hash) return false;
+    const expected = Buffer.from(hash, 'hex');
+    const candidate = await scryptAsync(password, salt, expected.length);
+    return timingSafeEqual(candidate, expected);
+}
+
+module.exports = { hashPassword, verifyPassword };

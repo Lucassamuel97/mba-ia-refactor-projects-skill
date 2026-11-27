@@ -1,7 +1,6 @@
+const { AppError } = require('../utils/errors');
 const { PAYMENT_STATUS } = require('../models/paymentModel');
-
-const UNKNOWN_STUDENT = 'Unknown';
-const NO_PAYMENT_AMOUNT = 0;
+const logger = require('../utils/logger');
 
 class ReportService {
     constructor({ reportModel }) {
@@ -9,29 +8,33 @@ class ReportService {
     }
 
     async financialReport() {
-        const rows = await this.reportModel.listCourseEnrollments();
-        const reportByCourse = new Map();
+        let rows;
+        try {
+            rows = await this.reportModel.financialRows();
+        } catch (err) {
+            logger.error('Erro DB', err);
+            throw new AppError('Erro DB', 500);
+        }
 
+        const courses = new Map();
         for (const row of rows) {
-            if (!reportByCourse.has(row.course_id)) {
-                reportByCourse.set(row.course_id, { course: row.course_title, revenue: 0, students: [] });
+            if (!courses.has(row.course_id)) {
+                courses.set(row.course_id, { course: row.course_title, revenue: 0, students: [] });
             }
             if (row.enrollment_id === null) continue;
 
-            const courseReport = reportByCourse.get(row.course_id);
+            const courseData = courses.get(row.course_id);
             const hasPayment = row.payment_id !== null;
-
             if (hasPayment && row.payment_status === PAYMENT_STATUS.PAID) {
-                courseReport.revenue += row.payment_amount;
+                courseData.revenue += row.payment_amount;
             }
-            courseReport.students.push({
-                student: row.user_id === null ? UNKNOWN_STUDENT : row.student_name,
-                paid: hasPayment ? row.payment_amount : NO_PAYMENT_AMOUNT,
+            courseData.students.push({
+                student: row.user_id !== null ? row.student_name : 'Unknown',
+                paid: hasPayment ? row.payment_amount : 0,
             });
         }
-
-        return [...reportByCourse.values()];
+        return [...courses.values()];
     }
 }
 
-module.exports = ReportService;
+module.exports = { ReportService };

@@ -1,51 +1,42 @@
-const { AsyncLocalStorage } = require('node:async_hooks');
-const sqlite3 = require('sqlite3').verbose();
+const sqlite3 = require('sqlite3');
 
-// Promises sobre o driver de callbacks. O banco em memória exige uma conexão única,
-// então os comandos passam por uma fila: nada de fora entra no meio de uma transação aberta.
-function createConnection(filename) {
-    const raw = new sqlite3.Database(filename);
-    const insideTransaction = new AsyncLocalStorage();
+// Promises sobre o driver de callbacks. Banco em memória exige conexão única:
+// ela é criada pelo composition root e injetada nos models.
+function createConnection(path) {
+    const raw = new sqlite3.Database(path);
+
+    const run = (sql, params = []) => new Promise((resolve, reject) => {
+        raw.run(sql, params, function onRun(err) {
+            if (err) reject(err);
+            else resolve({ lastID: this.lastID, changes: this.changes });
+        });
+    });
+    const get = (sql, params = []) => new Promise((resolve, reject) => {
+        raw.get(sql, params, (err, row) => (err ? reject(err) : resolve(row)));
+    });
+    const all = (sql, params = []) => new Promise((resolve, reject) => {
+        raw.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
+    });
+
+    // Transações serializadas: a conexão é compartilhada, então duas não podem se sobrepor.
     let queue = Promise.resolve();
-
-    function enqueue(task) {
-        const result = queue.then(task);
+    function transaction(work) {
+        const result = queue.then(async () => {
+            await run('BEGIN');
+            try {
+                const value = await work();
+                await run('COMMIT');
+                return value;
+            } catch (err) {
+                await run('ROLLBACK');
+                throw err;
+            }
+        });
         queue = result.catch(() => {});
         return result;
     }
 
-    function execute(method, sql, params) {
-        return new Promise((resolve, reject) => {
-            raw[method](sql, params, function onDone(err, rows) {
-                if (err) return reject(err);
-                resolve(method === 'run' ? { lastID: this.lastID, changes: this.changes } : rows);
-            });
-        });
-    }
-
-    function statement(method) {
-        return (sql, params = []) => (insideTransaction.getStore()
-            ? execute(method, sql, params)
-            : enqueue(() => execute(method, sql, params)));
-    }
-
-    function transaction(work) {
-        if (insideTransaction.getStore()) return work();
-
-        return enqueue(() => insideTransaction.run(true, async () => {
-            await execute('run', 'BEGIN', []);
-            try {
-                const result = await work();
-                await execute('run', 'COMMIT', []);
-                return result;
-            } catch (err) {
-                await execute('run', 'ROLLBACK', []);
-                throw err;
-            }
-        }));
-    }
-
-    return { run: statement('run'), get: statement('get'), all: statement('all'), transaction };
+    return { run, get, all, transaction };
 }
 
 module.exports = { createConnection };

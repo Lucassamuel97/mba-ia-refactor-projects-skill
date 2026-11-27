@@ -1,55 +1,64 @@
+const { AppError, BusinessRuleError, NotFoundError, UnauthorizedError } = require('../utils/errors');
 const { PAYMENT_STATUS } = require('../models/paymentModel');
-const { BusinessRuleError, NotFoundError } = require('../utils/errors');
+const { hashPassword, verifyPassword } = require('../utils/password');
+const logger = require('../utils/logger');
+
+// Falha de banco em uma etapa vira 500 com a mensagem que a API já usava para ela.
+async function step(promise, message) {
+    try {
+        return await promise;
+    } catch (err) {
+        if (err instanceof AppError) throw err;
+        logger.error(message, err);
+        throw new AppError(message, 500);
+    }
+}
 
 class CheckoutService {
-    constructor({
-        courseModel, userModel, enrollmentModel, paymentModel, auditLogModel,
-        paymentGateway, hashPassword, runInTransaction, logger,
-    }) {
-        this.courseModel = courseModel;
+    constructor({ db, userModel, courseModel, enrollmentModel, paymentModel, auditLogModel, paymentGateway }) {
+        this.db = db;
         this.userModel = userModel;
+        this.courseModel = courseModel;
         this.enrollmentModel = enrollmentModel;
         this.paymentModel = paymentModel;
         this.auditLogModel = auditLogModel;
         this.paymentGateway = paymentGateway;
-        this.hashPassword = hashPassword;
-        this.runInTransaction = runInTransaction;
-        this.logger = logger;
     }
 
-    async checkout({ name, email, password, courseId, cardNumber }) {
+    async checkout({ name, email, password, courseId, card }) {
         const course = await this.courseModel.findActiveById(courseId);
         if (!course) throw new NotFoundError('Curso não encontrado');
 
-        // Como no legado, a conta é criada antes da cobrança e permanece se o pagamento for recusado.
-        const userId = await this.findOrCreateUser({ name, email, password });
+        const existingUser = await step(this.userModel.findByEmail(email), 'Erro DB');
+        if (existingUser) await this.#ensurePassword(password, existingUser);
 
-        // A cobrança é externa ao banco: acontece antes, e só o resultado entra na transação.
-        const status = await this.paymentGateway.charge({ cardNumber, amount: course.price });
+        const status = await this.paymentGateway.charge({ card, amount: course.price });
         if (status === PAYMENT_STATUS.DENIED) throw new BusinessRuleError('Pagamento recusado');
 
-        const enrollmentId = await this.runInTransaction(async () => {
-            const newEnrollmentId = await this.enrollmentModel.create({ userId, courseId });
-            await this.paymentModel.create({ enrollmentId: newEnrollmentId, amount: course.price, status });
-            await this.auditLogModel.record(`Checkout curso ${courseId} por ${userId}`);
-            return newEnrollmentId;
+        return this.db.transaction(async () => {
+            const userId = await this.#resolveBuyer({ name, email, password, existingUser });
+            const enrollmentId = await step(this.enrollmentModel.create({ userId, courseId }), 'Erro Matrícula');
+            await step(this.paymentModel.create({ enrollmentId, amount: course.price, status }), 'Erro Pagamento');
+            await this.auditLogModel.create(`Checkout curso ${courseId} por ${userId}`);
+            return enrollmentId;
         });
-
-        this.logger.info(`Checkout concluído: matrícula ${enrollmentId} em "${course.title}"`);
-        return enrollmentId;
     }
 
-    // Busca e criação na mesma transação: dois checkouts simultâneos não duplicam o email.
-    findOrCreateUser({ name, email, password }) {
-        return this.runInTransaction(async () => {
-            const existingUser = await this.userModel.findByEmail(email);
-            if (existingUser) return existingUser.id;
+    async #ensurePassword(password, user) {
+        if (!(await verifyPassword(password, user.pass))) throw new UnauthorizedError('Credenciais inválidas');
+    }
 
-            // Sem pwd a conta fica sem senha utilizável (o legado gravava uma senha padrão conhecida).
-            const passwordHash = password ? await this.hashPassword(password) : null;
-            return this.userModel.create({ name, email, passwordHash });
-        });
+    // Dentro da transação: reconsulta o email para não duplicar a conta em checkouts concorrentes.
+    async #resolveBuyer({ name, email, password, existingUser }) {
+        if (existingUser) return existingUser.id;
+        const user = await step(this.userModel.findByEmail(email), 'Erro DB');
+        if (user) {
+            await this.#ensurePassword(password, user);
+            return user.id;
+        }
+        const passwordHash = await hashPassword(password);
+        return step(this.userModel.create({ name, email, passwordHash }), 'Erro ao criar usuário');
     }
 }
 
-module.exports = CheckoutService;
+module.exports = { CheckoutService };

@@ -1,27 +1,18 @@
 const { STATUS_CODES } = require('node:http');
 const { AppError } = require('../utils/errors');
+const logger = require('../utils/logger');
 
-const INTERNAL_ERROR_MESSAGE = 'Erro interno do servidor';
-
-const isClientError = (statusCode) => statusCode >= 400 && statusCode < 500;
-
-// As respostas de erro seguem em texto puro, como a API sempre respondeu.
-function createErrorHandler({ logger }) {
-    return function errorHandler(err, req, res, next) {
-        if (res.headersSent) return next(err);
-
-        if (err instanceof AppError) {
-            return res.status(err.statusCode).send(err.message);
-        }
-
-        // Erros 4xx do próprio framework (ex.: JSON malformado): mesmo status, sem stack trace.
-        if (err.expose && isClientError(err.statusCode)) {
-            return res.status(err.statusCode).send(STATUS_CODES[err.statusCode]);
-        }
-
-        logger.error(err);
-        res.status(500).send(INTERNAL_ERROR_MESSAGE);
-    };
+// eslint-disable-next-line no-unused-vars
+function errorHandler(err, req, res, next) {
+    if (err instanceof AppError) {
+        return res.status(err.statusCode).send(err.message);
+    }
+    // Erros HTTP do próprio Express (JSON malformado, corpo grande): mesmo status, sem stack trace.
+    if (err.status && err.status < 500) {
+        return res.status(err.status).send(err.status === 400 ? 'Bad Request' : STATUS_CODES[err.status]);
+    }
+    logger.error('Erro não tratado', err);
+    return res.status(500).send('Erro interno do servidor');
 }
 
-module.exports = { createErrorHandler };
+module.exports = { errorHandler };

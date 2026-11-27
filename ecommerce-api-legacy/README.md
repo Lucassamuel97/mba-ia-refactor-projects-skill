@@ -11,37 +11,40 @@ npm start
 
 A aplicação sobe em `http://localhost:3000`. O banco SQLite é em memória e já carrega seeds automaticamente no boot.
 
-Exemplos de requisições estão em `api.http`.
-
 ## Configuração
 
-Nenhuma variável de ambiente é obrigatória. As opcionais estão descritas em `.env.example`:
+Variáveis de ambiente (veja `.env.example`); nenhuma é obrigatória para subir:
 
-| Variável | Efeito |
-|---|---|
-| `PORT` | Porta HTTP (padrão `3000`) |
-| `ADMIN_TOKEN` | Libera as rotas administrativas para quem envia o cabeçalho `X-Admin-Token` com o mesmo valor |
-| `PAYMENT_GATEWAY_KEY` | Chave do gateway de pagamento (sem ela, o gateway é apenas simulado) |
-| `LOG_LEVEL` | `error`, `warn`, `info` (padrão) ou `debug` |
-
-`GET /api/admin/financial-report` e `DELETE /api/users/:id` respondem `403` enquanto `ADMIN_TOKEN` não estiver definido:
+- `PORT`: porta HTTP (padrão 3000).
+- `ADMIN_TOKEN`: token das rotas administrativas. Sem ele, essas rotas respondem 403 a todos os pedidos.
 
 ```bash
-ADMIN_TOKEN=meu-token npm start
-curl -H 'X-Admin-Token: meu-token' http://localhost:3000/api/admin/financial-report
+ADMIN_TOKEN=um-token-aleatorio npm start
 ```
+
+## Rotas
+
+| Rota | Acesso |
+|---|---|
+| `POST /api/checkout` | pública; `usr`, `eml`, `pwd`, `c_id` e `card` são obrigatórios. Se o email já tem conta, `pwd` precisa ser a senha dela (senão 401) |
+| `GET /api/admin/financial-report` | admin: cabeçalho `X-Admin-Token: <ADMIN_TOKEN>` |
+| `DELETE /api/users/:id` | admin: cabeçalho `X-Admin-Token: <ADMIN_TOKEN>`; responde 409 se o usuário tem matrículas |
+
+Sem o cabeçalho, as rotas de admin respondem 401; com token errado (ou sem `ADMIN_TOKEN` configurado), 403.
 
 ## Estrutura
 
 ```
 src/
-├── app.js          composition root: monta as camadas e inicia o servidor
-├── config/         configuração lida do ambiente
-├── database/       conexão (promises e transações) e schema com seed
-├── models/         SQL de cada entidade
-├── services/       checkout, relatório financeiro e gateway de pagamento
-├── controllers/    leitura e validação da requisição, resposta HTTP
-├── routes/         mapeamento de rotas
-├── middlewares/    guard de administrador e tratamento de erro central
-└── utils/          erros de domínio, logger e hash de senha
+├── app.js            composition root
+├── config/           configuração lida do ambiente
+├── database/         conexão (promises + transações) e schema/seed
+├── models/           SQL por entidade
+├── services/         checkout, gateway de pagamento, relatório, usuários
+├── controllers/      fluxo HTTP e validação de entrada
+├── routes/           mapeamento das rotas
+├── middlewares/      erro central, asyncHandler, guard de admin
+└── utils/            erros, logger, hash de senha
 ```
+
+Exemplos de requisições estão em `api.http`.

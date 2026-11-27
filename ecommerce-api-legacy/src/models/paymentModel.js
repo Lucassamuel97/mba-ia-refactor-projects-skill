@@ -5,11 +5,13 @@ class PaymentModel {
         this.db = db;
     }
 
-    create({ enrollmentId, amount, status }) {
-        return this.db.run('INSERT INTO payments (enrollment_id, amount, status) VALUES (?, ?, ?)',
-            [enrollmentId, amount, status]);
+    async create({ enrollmentId, amount, status }) {
+        const { lastID } = await this.db.run(
+            'INSERT INTO payments (enrollment_id, amount, status) VALUES (?, ?, ?)',
+            [enrollmentId, amount, status],
+        );
+        return lastID;
     }
 }
 
-module.exports = PaymentModel;
-module.exports.PAYMENT_STATUS = PAYMENT_STATUS;
+module.exports = { PaymentModel, PAYMENT_STATUS };

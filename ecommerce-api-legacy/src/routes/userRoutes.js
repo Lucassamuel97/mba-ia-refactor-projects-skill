@@ -1,5 +1,5 @@
 const express = require('express');
-const asyncHandler = require('../middlewares/asyncHandler');
+const { asyncHandler } = require('../middlewares/asyncHandler');
 
 function userRoutes({ userController, requireAdminToken }) {
     const router = express.Router();
@@ -7,4 +7,4 @@ function userRoutes({ userController, requireAdminToken }) {
     return router;
 }
 
-module.exports = userRoutes;
+module.exports = { userRoutes };

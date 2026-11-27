@@ -1,4 +1,5 @@
-// No Express 4, a rejeição de um handler async precisa ser encaminhada ao next.
-const asyncHandler = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+// Express 4 não encaminha rejeições de handlers async: este wrapper as entrega ao errorHandler.
+const asyncHandler = (handler) => (req, res, next) =>
+    Promise.resolve(handler(req, res, next)).catch(next);
 
-module.exports = asyncHandler;
+module.exports = { asyncHandler };

@@ -1,5 +1,5 @@
 const express = require('express');
-const asyncHandler = require('../middlewares/asyncHandler');
+const { asyncHandler } = require('../middlewares/asyncHandler');
 
 function adminRoutes({ reportController, requireAdminToken }) {
     const router = express.Router();
@@ -7,4 +7,4 @@ function adminRoutes({ reportController, requireAdminToken }) {
     return router;
 }
 
-module.exports = adminRoutes;
+module.exports = { adminRoutes };
